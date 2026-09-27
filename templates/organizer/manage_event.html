@@ -262,11 +262,11 @@
       <div class="cems-form-section">
         <h3 class="cems-section-title">🖼️ Event Banner</h3>
         
-        {% if event.image %}
+        {% if event.banner %}
         <div class="cems-form-group">
           <label class="cems-form-label">Current Banner</label>
           <div>
-            <img src="{{ url_for('static', filename=event.image) }}" alt="Event Banner" style="max-width: 300px; max-height: 150px; border-radius: 8px; border: 1px solid var(--cems-border);">
+            <img src="{{ event_image_url(event) }}" alt="Event Banner" style="max-width: 300px; max-height: 150px; border-radius: 8px; border: 1px solid var(--cems-border);">
           </div>
         </div>
         {% endif %}

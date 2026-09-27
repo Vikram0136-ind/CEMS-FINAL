@@ -183,6 +183,9 @@ resp = client.post("/register/faculty", data={
 })
 check("Faculty registration", resp.status_code in (200, 302))
 
+resp = client.get("/faculty/dashboard")
+check("Faculty dashboard access", resp.status_code == 200)
+
 # Test duplicate email
 client.post("/register/student", data={
     "name": "Dup", "email": "dup@test.com", "mobile": "+919876543216",

@@ -5,12 +5,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{% block title %}CEMS — {{ college_short }}{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/categories.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/features.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/role-workspace.css') }}">
+  {% block extra_head %}{% endblock %}
   <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/theme.js') }}"></script>
 </head>
-<body>
+<body data-theme="blush">
 <header class="topbar">
   <a class="brand" href="{{ url_for('landing') }}">
     <img src="{{ url_for('static', filename='images/agc-logo.svg') }}" alt="AGC logo" class="brand-logo">
@@ -70,6 +74,18 @@
 
   {% else %}
 
+    <div class="theme-switcher" aria-label="Theme selector">
+      <label class="theme-switcher-label" for="themeSelect">Theme</label>
+      <select id="themeSelect" class="theme-select">
+        <option value="blush">Blush Pink</option>
+        <option value="lavender">Lavender Dream</option>
+        <option value="peach">Peach Cream</option>
+        <option value="rose">Rose Berry</option>
+        <option value="mint">Soft Mint</option>
+        <option value="sky">Sky Blue</option>
+      </select>
+    </div>
+
     <!-- LOGIN -->
     <a class="nav-btn outline" href="{{ url_for('login') }}">
       Login
@@ -84,19 +100,84 @@
 </nav>
 </header>
 
-<main class="{% if current_user.is_authenticated %}app-shell{% endif %}">
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      <div class="flash-wrap">
-      {% for category, message in messages %}
-        <div class="flash {{ category }}">{{ message }} <button onclick="this.parentElement.remove()">×</button></div>
-      {% endfor %}
+{% set show_role_sidebar = current_user.is_authenticated and request.endpoint in ['student_dashboard', 'student_certificates', 'profile', 'student_resume_export', 'organizer_dashboard', 'organizer_profile', 'faculty_dashboard', 'teacher_dashboard', 'faculty_profile'] %}
+<div class="{% if show_role_sidebar %}cems-workspace-layout{% endif %}">
+  {% if show_role_sidebar %}
+  <aside class="cems-workspace-sidebar">
+    <div class="cems-workspace-brand"><strong>CEMS</strong><small>EVENT MANAGEMENT</small></div>
+    <nav aria-label="{{ current_user.role|title }} workspace">
+      {% if current_user.role == 'student' %}
+      <div class="cems-workspace-nav-group">
+        <span class="cems-workspace-nav-title">Main</span>
+        <a class="{% if request.endpoint == 'student_dashboard' %}active{% endif %}" href="{{ url_for('student_dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('events') }}">Discover Events</a>
+        <a href="{{ url_for('my_registrations') }}">My Registrations</a>
+        <a href="{{ url_for('my_tickets') }}">My Tickets</a>
+        <a class="{% if request.endpoint == 'student_certificates' %}active{% endif %}" href="{{ url_for('student_certificates') }}">My Certificates</a>
       </div>
-    {% endif %}
-  {% endwith %}
-  {% block content %}{% endblock %}
-</main>
+      <div class="cems-workspace-nav-group">
+        <span class="cems-workspace-nav-title">Explore</span>
+        <a href="{{ url_for('notices') }}">Notice Board</a>
+        <a href="{{ url_for('past_events') }}">Past Events</a>
+        <a href="{{ url_for('student_notifications') }}">Notifications</a>
+      </div>
+      <div class="cems-workspace-nav-group">
+        <span class="cems-workspace-nav-title">Account</span>
+        <a class="{% if request.endpoint == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">Profile</a>
+      </div>
+      {% elif current_user.role == 'organizer' %}
+      <div class="cems-workspace-nav-group">
+        <span class="cems-workspace-nav-title">Main</span>
+        <a class="{% if request.endpoint == 'organizer_dashboard' %}active{% endif %}" href="{{ url_for('organizer_dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('create_event') }}">+ Create Event</a>
+      </div>
+      <div class="cems-workspace-nav-group">
+        <span class="cems-workspace-nav-title">Event Management</span>
+        <a href="{{ url_for('organizer_reports') }}">Reports</a>
+        <a href="{{ url_for('checkin') }}">Check-in</a>
+        <a href="{{ url_for('kiosk') }}">QR Scanner</a>
+        <a href="{{ url_for('past_events') }}">Past Events</a>
+        <a href="{{ url_for('notices') }}">Notice Board</a>
+        <a href="{{ url_for('notices') }}">Faculty Notices</a>
+        <a href="{{ url_for('festival_calendar') }}">Festival Calendar</a>
+      </div>
+      <div class="cems-workspace-nav-group">
+        <span class="cems-workspace-nav-title">Resources</span>
+        <a href="{{ url_for('organizer_support', module='volunteers') }}">Volunteer Coordination</a>
+        <a href="{{ url_for('organizer_support', module='judges') }}">Judges and Guests</a>
+        <a href="{{ url_for('organizer_support', module='sponsors') }}">Sponsor Ledger</a>
+        <a class="{% if request.endpoint == 'organizer_profile' %}active{% endif %}" href="{{ url_for('organizer_profile') }}">Profile</a>
+      </div>
+      {% else %}
+      <div class="cems-workspace-nav-group">
+        <span class="cems-workspace-nav-title">Main</span>
+        <a class="{% if request.endpoint in ['faculty_dashboard', 'teacher_dashboard'] %}active{% endif %}" href="{{ url_for('faculty_dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('faculty_assigned_events') }}">Assigned Events</a>
+        <a href="{{ url_for('notices') }}">Faculty Notices</a>
+      </div>
+      <div class="cems-workspace-nav-group">
+        <span class="cems-workspace-nav-title">Account</span>
+        <a class="{% if request.endpoint == 'faculty_profile' %}active{% endif %}" href="{{ url_for('faculty_profile') }}">Profile</a>
+      </div>
+      {% endif %}
+    </nav>
+  </aside>
+  {% endif %}
+  <main class="{% if current_user.is_authenticated %}app-shell{% endif %}{% if show_role_sidebar %} cems-workspace-main{% endif %}">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-wrap">
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }} <button onclick="this.parentElement.remove()">×</button></div>
+        {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
 
 <footer><strong>{{ college_name }}</strong> · CEMS — Campus Event Management System · {{ agc_profile.address }}<br><span>Academic project interface inspired by the institutional information supplied for AGC.</span></footer>
+{% block extra_js %}{% endblock %}
 </body>
 </html>

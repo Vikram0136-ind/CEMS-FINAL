@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Create Account — ACEMS AGC{% endblock %}
-{% block extra_css %}
+{% block extra_head %}
 <style>
   /* ===== Page shell ===== */
   .acems-account-type-page {
@@ -307,16 +307,16 @@
 
   /* ===== STUDENT — Fresh & Youthful (Magenta) ===== */
   .acems-account-type-card--student {
-    --accent: #ec4899;
-    --accent-strong: #db246d;
-    --accent-soft: #fef1f6;
-    --accent-border: #fbcfe8;
-    --accent-shadow: rgba(236, 72, 153, 0.20);
+    --accent: #4f46e5;
+    --accent-strong: #4338ca;
+    --accent-soft: #eef2ff;
+    --accent-border: #c7d2fe;
+    --accent-shadow: rgba(79, 70, 229, 0.18);
     --deco-transform: rotate(10deg) scale(0.8);
   }
 
   .acems-account-type-card--student::before {
-    background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+    background: linear-gradient(90deg, var(--accent), #7c3aed);
     width: 72%;
     border-radius: 0 4px 4px 0;
   }
@@ -331,18 +331,18 @@
       var(--accent-soft);
   }
 
-  /* ===== FACULTY — Elegant & Academic (Indigo + Gold) ===== */
+  /* ===== FACULTY — Warm Amber & Gold ===== */
   .acems-account-type-card--faculty {
-    --accent: #4f46e5;
-    --accent-strong: #4338ca;
-    --accent-soft: #eef2ff;
-    --accent-border: #c7d2fe;
-    --accent-shadow: rgba(79, 70, 229, 0.19);
+    --accent: #d97706;
+    --accent-strong: #b45309;
+    --accent-soft: #fff7ed;
+    --accent-border: #fdba74;
+    --accent-shadow: rgba(217, 119, 6, 0.18);
     --deco-transform: rotate(-8deg) scale(0.8);
   }
 
   .acems-account-type-card--faculty::before {
-    background: linear-gradient(90deg, var(--accent), #d4a856);
+    background: linear-gradient(90deg, var(--accent), #facc15);
     width: 58%;
     border-radius: 0 0 4px 0;
   }
@@ -352,22 +352,22 @@
     height: 142px;
     border-radius: 50%;
     background:
-      repeating-linear-gradient(135deg, rgba(79, 70, 229, 0.12) 0 1px, transparent 1px 8px),
+      repeating-linear-gradient(135deg, rgba(217, 119, 6, 0.12) 0 1px, transparent 1px 8px),
       var(--accent-soft);
   }
 
-  /* ===== ORGANIZER — Creative & Event-Focused (Violet + Amber) ===== */
+  /* ===== ORGANIZER — Emerald & Green ===== */
   .acems-account-type-card--organizer {
-    --accent: #8b5cf6;
-    --accent-strong: #7c3aed;
-    --accent-soft: #f5f3ff;
-    --accent-border: #ddd6fe;
-    --accent-shadow: rgba(139, 92, 246, 0.19);
+    --accent: #059669;
+    --accent-strong: #047857;
+    --accent-soft: #ecfdf5;
+    --accent-border: #a7f3d0;
+    --accent-shadow: rgba(5, 150, 105, 0.18);
     --deco-transform: rotate(5deg) scale(0.8);
   }
 
   .acems-account-type-card--organizer::before {
-    background: linear-gradient(90deg, var(--accent), #f59e0b);
+    background: linear-gradient(90deg, var(--accent), #34d399);
     width: 84%;
     border-radius: 0 4px 4px 0;
   }
@@ -377,7 +377,7 @@
     height: 160px;
     border-radius: 50%;
     background:
-      repeating-radial-gradient(circle at 68% 34%, rgba(139, 92, 246, 0.14) 0 1px, transparent 1px 16px),
+      repeating-radial-gradient(circle at 68% 34%, rgba(5, 150, 105, 0.14) 0 1px, transparent 1px 16px),
       var(--accent-soft);
   }
 
@@ -890,8 +890,8 @@
         <span class="step-dot"></span>
         <span class="step-text">Step 1 of 2 — Choose your account type</span>
       </div>
-      <h1>Create Your ACEMS Account</h1>
-      <p>Select your role to begin registration. Each path is tailored to match your campus experience.</p>
+      <h1>Choose Your Account Type</h1>
+      <p>Select the role that matches your campus journey. Each account path is tailored to a different experience.</p>
     </div>
 
     <div class="acems-account-type-grid" role="group" aria-label="Account types">

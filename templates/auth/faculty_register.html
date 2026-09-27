@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Create your Faculty Account — ACEMS AGC{% endblock %}
-{% block extra_css %}
+{% block extra_head %}
 <style>
   .acems-faculty-register-page {
     min-height: 100vh;
@@ -367,8 +367,8 @@
   <div class="acems-faculty-register-container">
     <div class="acems-faculty-register-header">
       <div class="acems-faculty-register-icon">F</div>
-      <h1>Create your Faculty Account</h1>
-      <p>Access faculty-related campus activities, information and management tools.</p>
+      <h1>Faculty Registration</h1>
+      <p>Create your faculty account to participate in and manage campus activities.</p>
     </div>
 
     <div id="register-error-container">
@@ -433,7 +433,7 @@
           <div class="cems-form-group full-width">
             <label class="acems-form-label">Profile Photo <span class="optional">(Optional)</span></label>
             <div class="acems-file-input-wrapper">
-              <input type="file" name="profile_photo" id="reg-photo" class="acems-form-input" accept="image/*">
+              <input type="file" name="profile_photo" id="reg-photo" class="acems-form-input" accept="image/jpeg,image/png,image/webp">
             </div>
             <small class="acems-form-hint">Upload a profile photo (JPG, PNG, WEBP, max 2MB)</small>
             {% if errors and 'profile_photo' in errors %}
@@ -465,10 +465,34 @@
             {% endif %}
           </div>
           <div class="cems-form-group">
-            <label class="acems-form-label">Designation / Role</label>
+            <label class="acems-form-label">Designation</label>
             <input type="text" name="designation" id="reg-designation" class="acems-form-input" placeholder="e.g. Assistant Professor" value="{{ request.form.get('designation', '') }}">
             {% if errors and 'designation' in errors %}
             <span class="acems-form-error">{{ errors['designation'] }}</span>
+            {% endif %}
+          </div>
+          <div class="cems-form-group">
+            <label class="acems-form-label">Faculty Role <span class="required">*</span></label>
+            <select name="faculty_role" id="reg-faculty-role" class="acems-form-select" required>
+              <option value="">Select Faculty Role</option>
+              {% for role in faculty_roles %}
+              <option value="{{ role }}" {% if request.form.get('faculty_role') == role %}selected{% endif %}>{{ role }}</option>
+              {% endfor %}
+            </select>
+            {% if errors and 'faculty_role' in errors %}
+            <span class="acems-form-error">{{ errors['faculty_role'] }}</span>
+            {% endif %}
+          </div>
+          <div class="cems-form-group">
+            <label class="acems-form-label">Academic Session <span class="required">*</span></label>
+            <select name="academic_session" id="reg-academic-session" class="acems-form-select" required>
+              <option value="">Select Academic Session</option>
+              {% for session_name in academic_sessions %}
+              <option value="{{ session_name }}" {% if request.form.get('academic_session') == session_name %}selected{% endif %}>{{ session_name }}</option>
+              {% endfor %}
+            </select>
+            {% if errors and 'academic_session' in errors %}
+            <span class="acems-form-error">{{ errors['academic_session'] }}</span>
             {% endif %}
           </div>
         </div>
@@ -502,7 +526,7 @@
         <button type="button" class="acems-btn acems-btn-secondary acems-btn-step" id="faculty-step-back" style="display: none;">Back</button>
         <button type="button" class="acems-btn acems-btn-primary acems-btn-step" id="faculty-step-next">Next</button>
       </div>
-      <button type="submit" class="acems-btn acems-btn-primary acems-btn-lg" id="faculty-register-submit" style="display: none;">Create your Faculty Account</button>
+      <button type="submit" class="acems-btn acems-btn-primary acems-btn-lg" id="faculty-register-submit" style="display: none;">Create Faculty Account</button>
     </form>
 
     <div class="acems-auth-footer">
@@ -510,7 +534,7 @@
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 12H5M11 18l-6-6 6-6"></path></svg>
         Change Account Type
       </a>
-      <p style="margin-top: 14px;">Already have an account? <a href="{{ url_for('login') }}">Sign in</a></p>
+      <p style="margin-top: 14px;">Already have an account? <a href="{{ url_for('faculty_login_page') }}">Sign in</a></p>
     </div>
   </div>
 </div>
@@ -567,7 +591,7 @@
   function validateCurrentStep() {
     var stepFields = {
       1: ['name', 'email', 'mobile'],
-      2: ['employee_id', 'department', 'designation'],
+      2: ['employee_id', 'department', 'designation', 'faculty_role', 'academic_session'],
       3: ['password', 'confirm_password']
     };
     var fields = stepFields[currentStep] || [];

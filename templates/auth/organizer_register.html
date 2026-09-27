@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Create Organizer Account — ACEMS AGC{% endblock %}
-{% block extra_css %}
+{% block extra_head %}
 <style>
   .acems-organizer-register-page {
     min-height: 100vh;
@@ -399,7 +399,7 @@
           <div class="cems-form-group full-width">
             <label class="acems-form-label">Profile Photo (Optional)</label>
             <div class="acems-file-input-wrapper">
-              <input type="file" name="profile_photo" id="reg-photo" class="acems-form-input" accept="image/*">
+              <input type="file" name="profile_photo" id="reg-photo" class="acems-form-input" accept="image/jpeg,image/png,image/webp">
             </div>
             <small class="acems-form-hint">Upload a profile photo (JPG, PNG, WEBP, max 2MB)</small>
             {% if errors and 'profile_photo' in errors %}
@@ -437,7 +437,7 @@
           <div class="cems-form-group">
             <label class="acems-form-label">Organizer Type <span class="required">*</span></label>
             <select name="organizer_type" id="reg-organizer-type" class="acems-form-select" required>
-              <option value="">Select Organizer Type</option>
+              <option value="General" selected>General</option>
               <option value="Student Organizer">Student Organizer</option>
               <option value="Faculty Organizer">Faculty Organizer</option>
               <option value="Club / Society">Club / Society</option>
