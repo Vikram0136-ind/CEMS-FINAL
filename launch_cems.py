@@ -57,7 +57,7 @@ def launch_cems():
     print()
     print("Welcome! Your CEMS portal is loading...")
     print()
-    print("📍 Server: http://127.0.0.1:5000")
+    print("📍 Server: http://127.0.0.1:5001")
     print()
     print("🔐 Development accounts are seeded only when no users exist.")
     print("   Use the passwords printed by the setup script or reset them after first launch.")
@@ -67,7 +67,7 @@ def launch_cems():
     print("-" * 60)
     
     # Open in default browser
-    webbrowser.open("http://127.0.0.1:5000", new=1, autoraise=True)
+    webbrowser.open("http://127.0.0.1:5001", new=1, autoraise=True)
     
     print("✅ Browser opened!")
     print("Keep this window open while using CEMS.")

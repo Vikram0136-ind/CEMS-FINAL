@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Feedback — CEMS{% endblock %}
+{% block content %}
+<div class="cems-page-header">
+  <div>
+    <h1 class="cems-page-title">Event feedback</h1>
+    <p class="cems-page-description">Ratings and comments submitted by attendees.</p>
+  </div>
+  <div class="cems-page-actions"><a href="{{ url_for('organizer_reports') }}" class="cems-btn cems-btn-secondary">Back to reports</a></div>
+</div>
+{% for e, feedbacks in rows %}
+<div class="cems-card" style="margin-bottom:16px;">
+  <div class="cems-card-header"><div class="cems-card-title">{{ e.title }}</div><span class="cems-badge">{{ feedbacks|length }} response(s)</span></div>
+  <div class="cems-card-body">
+    {% for f in feedbacks %}
+    <div style="padding:8px 0;border-bottom:1px solid var(--cems-border);">
+      <strong>{{ '★' * f.rating }}{{ '☆' * (5 - f.rating) }}</strong>
+      <span style="color:var(--cems-text-muted);font-size:.8rem;">{{ f.created_at.strftime('%d %b %Y') if f.created_at }}</span>
+      <div>{{ f.comment or 'No comment.' }}</div>
+    </div>
+    {% else %}
+    <p class="cems-page-description">No feedback yet.</p>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<p class="cems-page-description">You have no events yet.</p>
+{% endfor %}
+{% endblock %}

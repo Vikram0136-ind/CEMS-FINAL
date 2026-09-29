@@ -9,6 +9,10 @@ services:
         generateValue: true
       - key: FLASK_ENV
         value: production
+      - key: SEED_DEMO_DATA
+        value: "false"
+      - key: ALLOW_DEMO_PAYMENTS
+        value: "false"
       - key: FLASK_DEBUG
         value: "0"
       - key: SESSION_COOKIE_SECURE

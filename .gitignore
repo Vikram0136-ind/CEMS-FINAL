@@ -19,3 +19,10 @@ static/uploads/*
 
 # VS Code
 .vscode/
+
+# macOS / tooling
+.DS_Store
+.pytest_cache/
+.kilo/
+instance/
+scratch/

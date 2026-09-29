@@ -1,16 +1,19 @@
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import csv
+import hashlib
 from io import BytesIO
 from io import StringIO
 from functools import wraps
 import os
+import re
 import secrets
 from types import SimpleNamespace
 from uuid import uuid4
 import qrcode
 from dotenv import load_dotenv
 from flask import Flask, render_template, redirect, url_for, request, flash, send_file, abort, jsonify, session
+from flask_wtf.csrf import generate_csrf
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_sqlalchemy import SQLAlchemy
 from reportlab.lib.pagesizes import A4
@@ -21,9 +24,24 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from markupsafe import Markup, escape
 
-from cems.extensions import csrf
+from cems.extensions import csrf, limiter, migrate
 
 load_dotenv()
+
+
+def utcnow():
+    """Naive UTC timestamp (datetime.utcnow() is deprecated)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _env_flag(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+IS_PRODUCTION = os.getenv("FLASK_ENV", "").lower() == "production" or bool(os.getenv("RENDER"))
 
 app = Flask(__name__)
 
@@ -240,10 +258,21 @@ AGC_NOTICES = [
     "AGC NEST 2026",
     "AICTE VAANI Seminar"
 ]
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-change-me")
+_secret_key = os.getenv("SECRET_KEY")
+if not _secret_key or _secret_key.startswith("change-this"):
+    if IS_PRODUCTION:
+        raise RuntimeError("SECRET_KEY must be set to a long random value in production.")
+    _secret_key = secrets.token_hex(32)  # dev only: sessions reset on restart
+app.config["SECRET_KEY"] = _secret_key
 app.config["WTF_CSRF_ENABLED"] = True
 app.config["WTF_CSRF_TIME_LIMIT"] = 3600
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SECURE"] = _env_flag("SESSION_COOKIE_SECURE", IS_PRODUCTION)
+app.config["REMEMBER_COOKIE_HTTPONLY"] = True
+app.config["REMEMBER_COOKIE_SAMESITE"] = "Lax"
+app.config["REMEMBER_COOKIE_SECURE"] = _env_flag("REMEMBER_COOKIE_SECURE", IS_PRODUCTION)
+app.config["RATELIMIT_ENABLED"] = _env_flag("RATELIMIT_ENABLED", True)
 db_url = os.getenv("DATABASE_URL", "sqlite:///cems.db")
 app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -253,12 +282,35 @@ app.jinja_env.globals["event_banner_url"] = event_banner_url
 app.jinja_env.globals["event_image_url"] = event_image_url
 
 
+def workflow_status(event):
+    status = (event.status or "").lower()
+    if status == "cancelled":
+        return "Cancelled"
+    if status == "completed":
+        return "Completed"
+    if status in ("cancellation_requested", "reschedule_requested"):
+        return status.replace("_", " ").title()
+    if getattr(event, "change_status", None) == "rescheduled":
+        return "Rescheduled"
+    return status.title() or "Pending"
+
+
+def is_event_completed(event):
+    return (event.status or "").lower() == "completed"
+
+
+app.jinja_env.globals["workflow_status"] = workflow_status
+app.jinja_env.globals["is_event_completed"] = is_event_completed
+
+
 @app.template_filter("nl2br")
 def nl2br(value):
     return Markup("<br>".join(escape(line) for line in str(value or "").splitlines()))
 
 csrf.init_app(app)
+limiter.init_app(app)
 db = SQLAlchemy(app)
+migrate.init_app(app, db)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
@@ -345,10 +397,26 @@ class User(UserMixin, db.Model):
         db.String(100)
     )
 
+    reset_token_expires = db.Column(
+        db.DateTime
+    )
+
+    account_state = db.Column(
+        db.String(20),
+        default="active"
+    )
+
     created_at = db.Column(
         db.DateTime,
-        default=datetime.utcnow
+        default=utcnow
     )
+
+    @property
+    def account_status(self):
+        state = self.account_state or ("active" if self.is_active_account else "disabled")
+        if not self.is_active_account and state == "active":
+            state = "disabled"
+        return SimpleNamespace(value=state)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -427,8 +495,14 @@ class Event(db.Model):
     fee = db.Column(db.Float, default=0)
     status = db.Column(db.String(30), default="pending")
     organizer_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    organizer = db.relationship("User", backref="organized_events")
+    created_at = db.Column(db.DateTime, default=utcnow)
+    completion_notes = db.Column(db.Text)
+    completed_by = db.Column(db.Integer, db.ForeignKey("user.id"))
+    completed_at = db.Column(db.DateTime)
+    rejection_reason = db.Column(db.Text)
+    cancellation_reason = db.Column(db.Text)
+    change_status = db.Column(db.String(30))
+    organizer = db.relationship("User", foreign_keys=[organizer_id], backref="organized_events")
 
 class EventFaculty(db.Model):
     __tablename__ = "event_faculty"
@@ -436,7 +510,7 @@ class EventFaculty(db.Model):
     event_id = db.Column(db.Integer, db.ForeignKey("event.id"), nullable=False)
     faculty_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     assigned_by = db.Column(db.Integer, db.ForeignKey("user.id"))
-    assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
+    assigned_at = db.Column(db.DateTime, default=utcnow)
     event = db.relationship("Event", backref="faculty_assignments")
     faculty = db.relationship("User", foreign_keys=[faculty_id], backref="assigned_events")
     assigner = db.relationship("User", foreign_keys=[assigned_by])
@@ -449,7 +523,7 @@ class Attendance(db.Model):
     student_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     status = db.Column(db.String(30), default="present")
     method = db.Column(db.String(30), default="manual")
-    marked_at = db.Column(db.DateTime, default=datetime.utcnow)
+    marked_at = db.Column(db.DateTime, default=utcnow)
 
 class AttendanceRecord(db.Model):
     __tablename__ = "attendance_record"
@@ -457,7 +531,7 @@ class AttendanceRecord(db.Model):
     registration_id = db.Column(db.Integer, db.ForeignKey("registration.id"), unique=True, nullable=False)
     status = db.Column(db.String(30), default="present")
     method = db.Column(db.String(30), default="manual")
-    recorded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    recorded_at = db.Column(db.DateTime, default=utcnow)
     check_in_time = db.Column(db.DateTime)
 
 class DigitalCertificate(db.Model):
@@ -465,7 +539,7 @@ class DigitalCertificate(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     registration_id = db.Column(db.Integer, db.ForeignKey("registration.id"), nullable=False)
     file_name = db.Column(db.String(200))
-    issued_at = db.Column(db.DateTime, default=datetime.utcnow)
+    issued_at = db.Column(db.DateTime, default=utcnow)
     status = db.Column(db.String(30), default="issued")
 
 class Registration(db.Model):
@@ -477,7 +551,7 @@ class Registration(db.Model):
     payment_status = db.Column(db.String(30), default="free")
     attended = db.Column(db.Boolean, default=False)
     checkin_time = db.Column(db.DateTime)
-    registered_at = db.Column(db.DateTime, default=datetime.utcnow)
+    registered_at = db.Column(db.DateTime, default=utcnow)
     user = db.relationship("User", backref="registrations")
     event = db.relationship("Event", backref="registrations")
     feedbacks = db.relationship("Feedback", backref="registration", cascade="all, delete-orphan")
@@ -488,7 +562,12 @@ class Notification(db.Model):
     title = db.Column(db.String(180), nullable=False)
     message = db.Column(db.Text, nullable=False)
     is_read = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_archived = db.Column(db.Boolean, default=False)
+    category = db.Column(db.String(30), default="general")
+    priority = db.Column(db.String(20), default="normal")
+    action_url = db.Column(db.String(255))
+    event_id = db.Column(db.Integer, db.ForeignKey("event.id"))
+    created_at = db.Column(db.DateTime, default=utcnow)
     user = db.relationship("User", backref="notifications")
 
 class Feedback(db.Model):
@@ -496,7 +575,7 @@ class Feedback(db.Model):
     registration_id = db.Column(db.Integer, db.ForeignKey("registration.id"), nullable=False)
     rating = db.Column(db.Integer, nullable=False)
     comment = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
     def __repr__(self):
         return f"<Feedback {self.id} for registration {self.registration_id}>"
@@ -530,6 +609,41 @@ class Sponsor(db.Model):
     event_id = db.Column(db.Integer, db.ForeignKey("event.id"))
     contribution = db.Column(db.Float, default=0)
 
+class VolunteerRole(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey("event.id"), nullable=False)
+    name = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text)
+    required_count = db.Column(db.Integer, default=1)
+    active = db.Column(db.Boolean, default=True)
+    event = db.relationship("Event", backref="volunteer_roles")
+
+
+class VolunteerApplication(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    role_id = db.Column(db.Integer, db.ForeignKey("volunteer_role.id"), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    status = db.Column(db.String(30), default="pending")
+    notes = db.Column(db.Text)
+    shift_start = db.Column(db.DateTime)
+    shift_end = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=utcnow)
+    role = db.relationship("VolunteerRole", backref="applications")
+    student = db.relationship("User")
+
+
+class VolunteerAssignment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    role_id = db.Column(db.Integer, db.ForeignKey("volunteer_role.id"), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    status = db.Column(db.String(30), default="assigned")
+    notes = db.Column(db.Text)
+    shift_start = db.Column(db.DateTime)
+    shift_end = db.Column(db.DateTime)
+    role = db.relationship("VolunteerRole", backref="assignments")
+    student = db.relationship("User")
+
+
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
@@ -546,7 +660,7 @@ def inject_globals():
         "unread_notifications": unread,
         "agc_profile": AGC_PROFILE,
         "agc_updates": AGC_UPDATES,
-        "now": datetime.utcnow,
+        "now": utcnow,
         "event_banner_url": event_banner_url,
         "event_image_url": event_image_url,
     }
@@ -591,8 +705,63 @@ def create_notification(user_id, title, message):
     db.session.add(Notification(user_id=user_id, title=title, message=message))
     db.session.commit()
 
+def send_email(to, subject, body):
+    """Send via SMTP when MAIL_SERVER is configured; otherwise log the message (development)."""
+    server = os.getenv("MAIL_SERVER")
+    if not server:
+        app.logger.warning("MAIL_SERVER not set; email to %s not sent.\nSubject: %s\n%s", to, subject, body)
+        return False
+    import smtplib
+    from email.message import EmailMessage
+    message = EmailMessage()
+    message["From"] = os.getenv("MAIL_FROM", os.getenv("MAIL_USERNAME", "no-reply@localhost"))
+    message["To"] = to
+    message["Subject"] = subject
+    message.set_content(body)
+    try:
+        with smtplib.SMTP(server, int(os.getenv("MAIL_PORT", 587)), timeout=15) as smtp:
+            if _env_flag("MAIL_USE_TLS", True):
+                smtp.starttls()
+            if os.getenv("MAIL_USERNAME"):
+                smtp.login(os.getenv("MAIL_USERNAME"), os.getenv("MAIL_PASSWORD", ""))
+            smtp.send_message(message)
+        return True
+    except Exception:
+        app.logger.exception("Failed to send email to %s", to)
+        return False
+
+
+def _add_missing_columns():
+    """Lightweight schema sync: add columns that models define but the database lacks."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(db.engine)
+    for table in db.metadata.sorted_tables:
+        if not inspector.has_table(table.name):
+            continue
+        existing = {col["name"] for col in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in existing:
+                continue
+            col_type = column.type.compile(db.engine.dialect)
+            with db.engine.begin() as conn:
+                conn.execute(text(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {col_type}'))
+
+
+ALLOW_DEMO_PAYMENTS = _env_flag("ALLOW_DEMO_PAYMENTS", not IS_PRODUCTION)
+SEED_DEMO_DATA = _env_flag("SEED_DEMO_DATA", not IS_PRODUCTION)
+_seeded = False
+
+
 def seed_data():
+    """Create tables; load demo accounts/events once, only when SEED_DEMO_DATA is on."""
+    global _seeded
+    if _seeded:
+        return
     db.create_all()
+    _add_missing_columns()
+    _seeded = True
+    if not SEED_DEMO_DATA:
+        return
 
     demo_users = [
         {
@@ -638,14 +807,8 @@ def seed_data():
                 roll_no=user_data.get("roll_no"),
                 mobile=user_data.get("mobile"),
             )
+            user.set_password(user_data["password"])
             db.session.add(user)
-        user.name = user_data["name"]
-        user.role = user_data["role"]
-        user.department = user_data["department"]
-        user.roll_no = user_data.get("roll_no") or user.roll_no
-        user.mobile = user_data.get("mobile") or user.mobile
-        user.is_active_account = True
-        user.set_password(user_data["password"])
 
     db.session.commit()
 
@@ -804,7 +967,7 @@ def notice_detail(index):
 
 @app.route("/notices")
 def notices():
-    published_at = datetime.utcnow()
+    published_at = utcnow()
     notice_rows = [
         SimpleNamespace(
             id=index + 1,
@@ -831,7 +994,7 @@ def board_notice_detail(notice_id):
         title=title,
         category="Campus Announcement",
         description=title,
-        published_at=datetime.utcnow() - timedelta(days=notice_id - 1),
+        published_at=utcnow() - timedelta(days=notice_id - 1),
         image=None,
         event=None,
         attachment=None,
@@ -1126,7 +1289,7 @@ def student_register_page():
             _delete_profile_photo(profile_image)
             return jsonify({"success": False, "errors": {"account": "An account with this email or student ID already exists."}}), 400
         return _registration_success("student_login", "Student account created successfully. Please sign in.")
-    return render_template("auth/student_register.html", today_iso=datetime.utcnow().date().isoformat(), academic_sessions=ACADEMIC_SESSIONS)
+    return render_template("auth/student_register.html", today_iso=utcnow().date().isoformat(), academic_sessions=ACADEMIC_SESSIONS)
 
 
 @app.route("/register/organizer", methods=["GET", "POST"])
@@ -1170,7 +1333,7 @@ def organizer_register_page():
             _delete_profile_photo(profile_image)
             return jsonify({"success": False, "errors": {"account": "An account with this email or organizer ID already exists."}}), 400
         return _registration_success("organizer_login", "Organizer account created successfully. Please sign in.")
-    return render_template("auth/organizer_register.html", today_iso=datetime.utcnow().date().isoformat(), academic_sessions=ACADEMIC_SESSIONS)
+    return render_template("auth/organizer_register.html", today_iso=utcnow().date().isoformat(), academic_sessions=ACADEMIC_SESSIONS)
 
 
 @app.route("/register/faculty", methods=["GET", "POST"])
@@ -1215,11 +1378,10 @@ def faculty_register_page():
             _delete_profile_photo(profile_image)
             return jsonify({"success": False, "errors": {"account": "An account with this email or faculty ID already exists."}}), 400
         return _registration_success("faculty_login_page", "Faculty account created successfully. Please sign in.")
-    return render_template("auth/faculty_register.html", today_iso=datetime.utcnow().date().isoformat(), academic_sessions=ACADEMIC_SESSIONS, faculty_roles=FACULTY_ROLES)
+    return render_template("auth/faculty_register.html", today_iso=utcnow().date().isoformat(), academic_sessions=ACADEMIC_SESSIONS, faculty_roles=FACULTY_ROLES)
 
 
 def _login_for_role(expected_role=None, template="auth/login.html"):
-    seed_data()
 
     if current_user.is_authenticated:
         return redirect(url_for(get_role_dashboard_route(current_user.role)))
@@ -1362,14 +1524,20 @@ def student_login_page():
 def login():
     return _login_for_role()
 
+def _hash_reset_token(token):
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
 @app.route("/forgot-password", methods=["GET", "POST"])
+@limiter.limit("5 per hour", methods=["POST"])
 def forgot_password():
     if request.method == "POST":
         email = request.form.get("email","").strip().lower()
         user = User.query.filter_by(email=email).first()
         if user:
             token = secrets.token_urlsafe(32)
-            user.reset_token = token
+            user.reset_token = _hash_reset_token(token)
+            user.reset_token_expires = utcnow() + timedelta(hours=1)
             db.session.commit()
             reset_url = url_for("reset_password", token=token, _external=True)
             send_email(email, "CEMS password reset", f"Reset your password:\n{reset_url}")
@@ -1378,8 +1546,12 @@ def forgot_password():
     return render_template("auth/forgot.html")
 
 @app.route("/reset-password/<token>", methods=["GET", "POST"])
+@limiter.limit("10 per hour", methods=["POST"])
 def reset_password(token):
-    user = User.query.filter_by(reset_token=token).first_or_404()
+    user = User.query.filter_by(reset_token=_hash_reset_token(token)).first()
+    if user is None or not user.reset_token_expires or user.reset_token_expires < utcnow():
+        flash("This password reset link is invalid or has expired.", "danger")
+        return redirect(url_for("forgot_password"))
     if request.method == "POST":
         password = request.form.get("password","")
         confirm = request.form.get("confirm_password","")
@@ -1388,12 +1560,13 @@ def reset_password(token):
         else:
             user.set_password(password)
             user.reset_token = None
+            user.reset_token_expires = None
             db.session.commit()
             flash("Password updated. Please log in.", "success")
             return redirect(url_for("login"))
     return render_template("auth/reset.html")
 
-@app.route("/logout")
+@app.route("/logout", methods=["POST"])
 @login_required
 def logout():
     logout_user()
@@ -1537,7 +1710,7 @@ def teacher_attendance_api(event_id):
 
 
 def _save_faculty_attendance(registration, status, method="faculty_manual"):
-    now = datetime.utcnow()
+    now = utcnow()
     attendance = AttendanceRecord.query.filter_by(registration_id=registration.id).first()
     if attendance is None:
         attendance = AttendanceRecord(registration_id=registration.id)
@@ -1636,7 +1809,7 @@ def events():
         query = query.filter(Event.title.ilike(f"%{q}%"))
     if category:
         query = query.filter_by(category=category)
-    today = datetime.utcnow().date()
+    today = utcnow().date()
     if status == "upcoming":
         query = query.filter(Event.date >= today)
     elif status == "completed":
@@ -1652,7 +1825,7 @@ def past_events():
     category = request.args.get("category", "").strip()
     venue = request.args.get("venue", "").strip()
     page = request.args.get("page", 1, type=int)
-    today = datetime.utcnow().date()
+    today = utcnow().date()
 
     query = Event.query.filter(Event.status == "approved", Event.date < today)
     if q:
@@ -1673,7 +1846,7 @@ def past_events():
 @app.route("/past-events/<int:event_id>")
 def past_event_detail(event_id):
     event = Event.query.get_or_404(event_id)
-    if event.date >= datetime.utcnow().date():
+    if event.date >= utcnow().date():
         abort(404)
     return render_template("past_event_detail.html", event=event)
 
@@ -1707,9 +1880,9 @@ def event_details(event_id):
         reg_ctx.update(message="Student registration only", reason="Sign in with a student account to register for events.")
     elif event.status != "approved":
         reg_ctx.update(message="Event not approved", reason="Registration opens after the event is approved.")
-    elif event.date and event.date < datetime.utcnow().date():
+    elif event.date and event.date < utcnow().date():
         reg_ctx.update(message="Event completed", reason="Registration is closed for past events.")
-    elif event.registration_deadline and datetime.utcnow().date() > event.registration_deadline:
+    elif event.registration_deadline and utcnow().date() > event.registration_deadline:
         reg_ctx.update(message="Registration closed", reason="The registration deadline has passed.")
     elif seats <= 0:
         reg_ctx.update(message="Event full", reason="All available places have been reserved.")
@@ -1723,7 +1896,7 @@ def event_details(event_id):
 @app.route("/student/dashboard")
 @role_required("student")
 def student_dashboard():
-    today = datetime.utcnow().date()
+    today = utcnow().date()
     user_regs = Registration.query.filter_by(user_id=current_user.id).order_by(Registration.registered_at.desc()).all()
     upcoming = Event.query.filter(Event.status == "approved", Event.date >= today).order_by(Event.date).limit(4).all()
     upcoming_registered = [reg.event for reg in user_regs if reg.event and reg.event.date >= today]
@@ -1768,7 +1941,7 @@ def student_events():
     category = request.args.get("category", "").strip()
     status = request.args.get("status", "open").strip()
     page = request.args.get("page", 1, type=int)
-    today = datetime.utcnow().date()
+    today = utcnow().date()
 
     query = Event.query.filter(Event.status == "approved", Event.date >= today)
     if q:
@@ -1825,7 +1998,7 @@ def register_event(event_id):
     if count >= event.capacity:
         flash("This event is full.", "danger")
         return redirect(url_for("event_details", event_id=event.id))
-    if event.registration_deadline and datetime.utcnow().date() > event.registration_deadline:
+    if event.registration_deadline and utcnow().date() > event.registration_deadline:
         flash("Registration deadline has passed.", "danger")
         return redirect(url_for("event_details", event_id=event.id))
     if request.method == "POST":
@@ -1923,11 +2096,7 @@ def ticket_download(registration_id):
 @app.route("/student/notifications")
 @role_required("student")
 def student_notifications():
-    notes = Notification.query.filter_by(user_id=current_user.id).order_by(Notification.created_at.desc()).all()
-    for n in notes:
-        n.is_read = True
-    db.session.commit()
-    return render_template("student/notifications.html", notifications=notes)
+    return _notification_page("student/notifications.html")
 
 def _ensure_account_profile(user):
     if normalize_role(user.role) == "student":
@@ -2009,7 +2178,7 @@ def profile():
 
     registrations = Registration.query.filter_by(user_id=current_user.id).order_by(Registration.registered_at.desc()).all()
     attended = [registration for registration in registrations if registration.attended]
-    upcoming = [registration for registration in registrations if registration.event and registration.event.date >= datetime.utcnow().date()]
+    upcoming = [registration for registration in registrations if registration.event and registration.event.date >= utcnow().date()]
     volunteer_records = Volunteer.query.filter_by(email=current_user.email).order_by(Volunteer.id.desc()).all()
     return render_template(
         "account/profile.html",
@@ -2057,7 +2226,8 @@ def student_resume_export():
 @role_required("student")
 def student_certificates():
     registrations = Registration.query.filter_by(user_id=current_user.id, attended=True).order_by(Registration.registered_at.desc()).all()
-    return render_template("student/certificates.html", registrations=registrations)
+    certificates = [(_certificate_info(r), r, r.event) for r in registrations]
+    return render_template("student/certificates.html", registrations=registrations, certificates=certificates)
 
 
 @app.route("/organizer/profile")
@@ -2224,14 +2394,6 @@ def kiosk_checkin_api():
         "ticket_code": registration.ticket_code,
         "checkin_time": registration.checkin_time.isoformat() if registration.checkin_time else None,
     })
-
-@app.route("/organizer/volunteer-management")
-@role_required("organizer")
-def organizer_volunteer_management():
-    events = Event.query.filter_by(organizer_id=current_user.id).order_by(Event.date.desc()).all()
-    event = events[0] if events else None
-    return render_template("organizer/volunteer_management.html", events=events, event=event, roles=[],
-                           applications=[], assignments=[], students=[], default_role_names=[])
 
 @app.route("/organizer/events/<int:event_id>/participants")
 @role_required("organizer")
@@ -2423,14 +2585,28 @@ def organizer_reports():
     total_reg = sum(len(e.registrations) for e in events)
     total_att = sum(1 for e in events for r in e.registrations if r.attended)
     revenue = sum(e.fee * sum(1 for r in e.registrations if r.payment_status=="paid") for e in events)
-    return render_template("organizer/reports.html", events=events, total_events=total_events,
-                           total_reg=total_reg, total_att=total_att, revenue=revenue)
+    months = _month_labels()
+    status_counts = {}
+    for e in events:
+        status_counts[e.status] = status_counts.get(e.status, 0) + 1
+    return render_template(
+        "organizer/reports.html", events=events, total_events=total_events, total_reg=total_reg,
+        total_att=total_att, revenue=revenue,
+        monthly_registrations=[sum(1 for e in events for r in e.registrations
+                                   if r.registered_at and (r.registered_at.year, r.registered_at.month) == ym)
+                               for ym in months],
+        months_ordered=[datetime(y, m, 1).strftime("%b %Y") for y, m in months],
+        events_by_status=status_counts,
+        revenue_by_event={e.title: e.fee * sum(1 for r in e.registrations if r.payment_status == "paid") for e in events})
 
 
 @app.route("/payment/<int:event_id>", methods=["GET","POST"])
 @role_required("student")
 def demo_payment(event_id):
     event = Event.query.get_or_404(event_id)
+    if not ALLOW_DEMO_PAYMENTS:
+        flash("Online payment is not available. Please contact the event organizer.", "warning")
+        return redirect(url_for("event_details", event_id=event.id))
     existing = Registration.query.filter_by(user_id=current_user.id, event_id=event.id).first()
     if existing:
         return redirect(url_for("ticket", registration_id=existing.id))
@@ -2446,7 +2622,7 @@ def demo_payment(event_id):
         db.session.commit()
         flash("Demo payment successful. Your ticket has been generated.", "success")
         return redirect(url_for("ticket", registration_id=reg.id))
-    return render_template("student/payment.html", event=event)
+    return render_template("student/demo_payment.html", event=event)
 
 @app.route("/certificate/<int:registration_id>")
 @login_required
@@ -2483,18 +2659,137 @@ def certificate(registration_id):
     buf.seek(0)
     return send_file(buf, mimetype="application/pdf", as_attachment=True, download_name=f"certificate-{reg.ticket_code}.pdf")
 
+def _month_labels(count=6):
+    today = utcnow().date().replace(day=1)
+    months = []
+    for i in range(count - 1, -1, -1):
+        year, month = today.year, today.month - i
+        while month <= 0:
+            year, month = year - 1, month + 12
+        months.append((year, month))
+    return months
+
+
+def _event_time_bounds(event):
+    def parse(value):
+        for fmt in ("%I:%M %p", "%H:%M"):
+            try:
+                return datetime.strptime((value or "").strip(), fmt).time()
+            except ValueError:
+                continue
+        return None
+    start, end = parse(event.start_time), parse(event.end_time)
+    return (datetime.combine(event.date, start) if start else None,
+            datetime.combine(event.date, end) if end else None)
+
+
+def _event_row(event):
+    start, end = _event_time_bounds(event)
+    now = utcnow()
+    return SimpleNamespace(
+        title=event.title, category=event.category, date=event.date, start_time=event.start_time,
+        end_time=event.end_time, venue=event.venue, capacity=event.capacity,
+        organizer=event.organizer.name if event.organizer else "—",
+        registrations=len(event.registrations), status_label=(event.status or "").replace("_", " ").title(),
+        is_live=bool(start and end and start <= now <= end),
+        url=url_for("event_details", event_id=event.id),
+    )
+
+
+def _build_admin_dashboard():
+    now = utcnow()
+    today = now.date()
+    events = Event.query.all()
+    regs = Registration.query.all()
+    approved = [e for e in events if e.status == "approved"]
+    attended = sum(1 for r in regs if r.attended)
+    metrics = SimpleNamespace(
+        events=len(events), registrations=len(regs), attendance=attended,
+        attendance_rate=round(100 * attended / len(regs)) if regs else 0,
+        certificates=attended,
+        completed_events=sum(1 for e in events if e.status == "completed" or (e.status == "approved" and e.date < today)),
+        live_events=sum(1 for e in approved if e.date == today),
+        upcoming_events=sum(1 for e in approved if e.date >= today),
+        pending_approvals=sum(1 for e in events if e.status == "pending"),
+        students=User.query.filter_by(role="student").count(),
+        organizers=User.query.filter_by(role="organizer").count(),
+        venues=Venue.query.count(), resources=Venue.query.count(),
+        volunteers=Volunteer.query.count() + VolunteerAssignment.query.count(),
+    )
+    months = _month_labels()
+
+    def in_month(dt, ym):
+        return dt is not None and (dt.year, dt.month) == ym
+
+    feedback_by_event = {}
+    for e in events:
+        ratings = [f.rating for r in e.registrations for f in r.feedbacks]
+        if ratings:
+            feedback_by_event[e.title[:24]] = round(sum(ratings) / len(ratings), 2)
+    categories, venue_use, role_counts = {}, {}, {}
+    for e in events:
+        categories[e.category] = categories.get(e.category, 0) + 1
+        venue_use[e.venue] = venue_use.get(e.venue, 0) + 1
+    for a in VolunteerAssignment.query.all():
+        if a.role:
+            role_counts[a.role.name] = role_counts.get(a.role.name, 0) + 1
+    analytics = {
+        "months": [datetime(y, m, 1).strftime("%b") for y, m in months],
+        "events_by_month": [sum(1 for e in events if in_month(e.created_at, ym)) for ym in months],
+        "registrations_trend": [sum(1 for r in regs if in_month(r.registered_at, ym)) for ym in months],
+        "attendance_trend": [sum(1 for r in regs if r.attended and in_month(r.registered_at, ym)) for ym in months],
+        "certificate_generation": [sum(1 for r in regs if r.attended and in_month(r.registered_at, ym)) for ym in months],
+        "event_categories": {"labels": list(categories), "data": list(categories.values())},
+        "venue_utilization": [{"label": k, "value": v} for k, v in sorted(venue_use.items(), key=lambda kv: -kv[1])[:6]],
+        "volunteer_participation": [{"label": k, "value": v} for k, v in role_counts.items()],
+        "event_feedback": {"labels": list(feedback_by_event), "data": list(feedback_by_event.values())},
+    }
+    venue_conflicts = []
+    by_slot = {}
+    for e in approved:
+        by_slot.setdefault((e.venue, e.date), []).append(e)
+    for (venue, day), group in by_slot.items():
+        for i, first in enumerate(group):
+            for second in group[i + 1:]:
+                s1, e1 = _event_time_bounds(first)
+                s2, e2 = _event_time_bounds(second)
+                if s1 and e1 and s2 and e2 and s1 < e2 and s2 < e1:
+                    venue_conflicts.append(SimpleNamespace(
+                        event_a=first.title, event_b=second.title, severity="High",
+                        time=f"{day.strftime('%d %b')} · {venue}"))
+    pending = [e for e in events if e.status == "pending"]
+    alerts = []
+    if pending:
+        alerts.append(SimpleNamespace(severity="warning", title=f"{len(pending)} event(s) awaiting approval",
+                                      detail="Review and approve or reject pending events.", url=url_for("admin_events")))
+    if venue_conflicts:
+        alerts.append(SimpleNamespace(severity="danger", title=f"{len(venue_conflicts)} venue conflict(s)",
+                                      detail="Two events overlap at the same venue.", url=url_for("admin_events")))
+    activities = [
+        SimpleNamespace(type="registration", title="New registration",
+                        description=f"{r.user.name} registered for {r.event.title}", actor=r.user.name,
+                        timestamp=r.registered_at or now, url=url_for("admin_registrations"))
+        for r in sorted(regs, key=lambda r: r.registered_at or now, reverse=True)[:6]
+    ]
+    quick_actions = [
+        SimpleNamespace(label="Review events", description="Approve or reject submitted events", url=url_for("admin_events"), tone="pink"),
+        SimpleNamespace(label="Manage venues", description="Add and edit campus venues", url=url_for("admin_venues"), tone="blue"),
+        SimpleNamespace(label="View live events", description="See what is happening today", url=url_for("events"), tone="green"),
+    ]
+    panels = SimpleNamespace(
+        pending_approvals=[_event_row(e) for e in pending[:6]],
+        today_events=[_event_row(e) for e in approved if e.date == today][:6],
+        venue_conflicts=venue_conflicts, resource_conflicts=[], alerts=alerts,
+        recent_activities=activities,
+    )
+    return SimpleNamespace(generated_at=now, metrics=metrics, panels=panels, analytics=analytics,
+                           quick_actions=quick_actions)
+
+
 @app.route("/admin/dashboard")
 @role_required("admin")
 def admin_dashboard():
-    stats = {
-        "users": User.query.count(),
-        "events": Event.query.count(),
-        "registrations": Registration.query.count(),
-        "attendees": Registration.query.filter_by(attended=True).count(),
-        "pending_events": Event.query.filter_by(status="pending").count()
-    }
-    events = Event.query.order_by(Event.created_at.desc()).limit(8).all()
-    return render_template("admin/dashboard.html", stats=stats, events=events)
+    return render_template("admin/dashboard.html", dashboard=_build_admin_dashboard())
 
 @app.route("/admin/users")
 @role_required("admin")
@@ -2544,28 +2839,49 @@ def admin_reports():
     total_revenue = sum(r.event.fee for r in Registration.query.filter_by(payment_status="paid").all())
     feedbacks = Feedback.query.all()
     avg = round(sum(f.rating for f in feedbacks)/len(feedbacks), 2) if feedbacks else 0
+    distribution = {i: sum(1 for f in feedbacks if f.rating == i) for i in range(1, 6)}
+    words = {}
+    for f in feedbacks:
+        for word in re.findall(r"[a-z]{5,}", (f.comment or "").lower()):
+            words[word] = words.get(word, 0) + 1
+    themes = [SimpleNamespace(theme=w, count=c) for w, c in sorted(words.items(), key=lambda kv: -kv[1])[:12]]
+    per_event, per_category = {}, {}
+    for f in feedbacks:
+        event = f.registration.event
+        per_event.setdefault(event, []).append(f.rating)
+        per_category.setdefault(event.category, []).append(f.rating)
+    top_events = sorted(
+        (SimpleNamespace(title=e.title, category=e.category, avg_rating=sum(v) / len(v), feedback_count=len(v))
+         for e, v in per_event.items()),
+        key=lambda t: -t.avg_rating)[:5]
     return render_template("admin/reports.html",
                            total_revenue=total_revenue,
                            avg_rating=avg,
                            users=User.query.count(),
                            events=Event.query.count(),
                            registrations=Registration.query.count(),
-                           attendees=Registration.query.filter_by(attended=True).count())
+                           attendees=Registration.query.filter_by(attended=True).count(),
+                           rating_distribution=distribution,
+                           total_feedbacks=len(feedbacks),
+                           anonymous_count=sum(1 for f in feedbacks if not f.comment),
+                           themes=themes,
+                           top_events=top_events,
+                           category_averages={k: round(sum(v) / len(v), 2) for k, v in per_category.items()})
 
 @app.route("/admin/notifications", methods=["GET","POST"])
 @role_required("admin")
 def admin_notifications():
-    users = User.query.filter(User.role != "admin").all()
     if request.method == "POST":
-        title = request.form.get("title","Campus Update")
-        message = request.form.get("message","")
-        selected = request.form.get("audience","all")
+        users = User.query.filter(User.role != "admin").all()
+        title = request.form.get("title", "Campus Update")
+        message = request.form.get("message", "")
+        selected = request.form.get("audience", "all")
         targets = users if selected == "all" else [u for u in users if u.role == selected]
         for u in targets:
-            create_notification(u.id, title, message)
+            db.session.add(Notification(user_id=u.id, title=title, message=message))
         db.session.commit()
         flash(f"Notification sent to {len(targets)} users.", "success")
-    return render_template("admin/notifications.html")
+    return _notification_page("admin/notifications.html")
 
 
 @app.route("/admin/venues", methods=["GET","POST"])
@@ -2611,7 +2927,7 @@ def organizer_support(module):
 
 @app.route("/health")
 def health():
-    return {"status":"ok","college":COLLEGE,"time":datetime.utcnow().isoformat()}
+    return {"status":"ok","college":COLLEGE,"time":utcnow().isoformat()}
 
 @app.errorhandler(404)
 def not_found(error):
@@ -2621,8 +2937,510 @@ def not_found(error):
 def forbidden(error):
     return render_template("errors/403.html"), 403
 
+# ---------------------------------------------------------------------------
+# Notifications API + page context
+# ---------------------------------------------------------------------------
+NOTIFICATION_CATEGORIES = {
+    "general": {"label": "General", "icon": "🔔", "color": "primary"},
+    "event": {"label": "Events", "icon": "📅", "color": "info"},
+    "registration": {"label": "Registrations", "icon": "🎟️", "color": "success"},
+    "payment": {"label": "Payments", "icon": "💳", "color": "warning"},
+    "system": {"label": "System", "icon": "⚙️", "color": "secondary"},
+}
+
+
+def _notification_page(template):
+    notes = (Notification.query
+             .filter_by(user_id=current_user.id, is_archived=False)
+             .order_by(Notification.created_at.desc()).all())
+    return render_template(
+        template,
+        notifications=notes,
+        notification_categories=NOTIFICATION_CATEGORIES,
+        unread_notifications=sum(1 for n in notes if not n.is_read),
+        read_ids=[n.id for n in notes if n.is_read],
+        csrf=generate_csrf(),
+    )
+
+
+@app.route("/api/notifications/<action>", methods=["POST"])
+@login_required
+def api_notifications(action):
+    if action not in ("mark-read", "mark-unread", "archive", "delete"):
+        abort(404)
+    payload = request.get_json(silent=True) or {}
+    query = Notification.query.filter_by(user_id=current_user.id)
+    if not payload.get("all"):
+        ids = [int(i) for i in payload.get("ids", []) if str(i).isdigit()]
+        query = query.filter(Notification.id.in_(ids))
+    notes = query.all()
+    for note in notes:
+        if action == "mark-read":
+            note.is_read = True
+        elif action == "mark-unread":
+            note.is_read = False
+        elif action == "archive":
+            note.is_archived = True
+        else:
+            db.session.delete(note)
+    db.session.commit()
+    return jsonify({"success": True, "count": len(notes)})
+
+
+# ---------------------------------------------------------------------------
+# Admin: user status, exports, dashboard refresh
+# ---------------------------------------------------------------------------
+@app.route("/admin/users/<int:user_id>/status", methods=["POST"])
+@role_required("admin")
+def update_user_status(user_id):
+    user = User.query.get_or_404(user_id)
+    status = request.form.get("status", "")
+    if status not in ("active", "suspended", "disabled"):
+        abort(400)
+    if user.id == current_user.id:
+        flash("You cannot change the status of your own admin account.", "warning")
+    else:
+        user.account_state = status
+        user.is_active_account = status == "active"
+        db.session.commit()
+        flash(f"{user.name} is now {status}.", "success")
+    return redirect(url_for("admin_users"))
+
+
+def _csv_response(filename, header, rows):
+    out = StringIO()
+    writer = csv.writer(out)
+    writer.writerow(header)
+    for row in rows:
+        # Guard against spreadsheet formula injection from user-supplied text.
+        writer.writerow([("'" + c) if isinstance(c, str) and c[:1] in ("=", "+", "-", "@") else c for c in row])
+    data = BytesIO(out.getvalue().encode("utf-8-sig"))
+    return send_file(data, mimetype="text/csv", as_attachment=True, download_name=filename)
+
+
+def _registration_rows(registrations):
+    return [
+        [r.ticket_code, r.user.name, r.user.email, r.event.title, r.status, r.payment_status,
+         "Yes" if r.attended else "No", r.registered_at.strftime("%Y-%m-%d %H:%M") if r.registered_at else ""]
+        for r in registrations
+    ]
+
+
+_REGISTRATION_HEADER = ["Ticket", "Name", "Email", "Event", "Status", "Payment", "Attended", "Registered at"]
+
+
+@app.route("/admin/registrations/export")
+@role_required("admin")
+def export_registrations():
+    regs = Registration.query.order_by(Registration.registered_at.desc()).all()
+    return _csv_response("registrations.csv", _REGISTRATION_HEADER, _registration_rows(regs))
+
+
+@app.route("/organizer/events/<int:event_id>/registrations/export")
+@role_required("organizer")
+def export_event_registrations(event_id):
+    event = Event.query.get_or_404(event_id)
+    if event.organizer_id != current_user.id:
+        abort(403)
+    return _csv_response(f"event-{event.id}-registrations.csv", _REGISTRATION_HEADER, _registration_rows(event.registrations))
+
+
+@app.route("/organizer/reports/export")
+@role_required("organizer")
+def organizer_reports_export_csv():
+    events = Event.query.filter_by(organizer_id=current_user.id).order_by(Event.date.desc()).all()
+    rows = [[e.title, e.category, e.date.isoformat(), e.venue, e.status, len(e.registrations),
+             sum(1 for r in e.registrations if r.attended),
+             e.fee * sum(1 for r in e.registrations if r.payment_status == "paid")] for e in events]
+    return _csv_response("organizer-report.csv", ["Event", "Category", "Date", "Venue", "Status",
+                                                  "Registrations", "Attended", "Revenue"], rows)
+
+
+@app.route("/api/admin/dashboard")
+@role_required("admin")
+def api_admin_dashboard():
+    return jsonify({"success": True, "generated_at": utcnow().isoformat()})
+
+
+@app.route("/api/organizer/registrations/<int:registration_id>/verify-payment", methods=["POST"])
+@role_required("organizer")
+def api_verify_payment_organizer(registration_id):
+    reg = Registration.query.get_or_404(registration_id)
+    if reg.event.organizer_id != current_user.id:
+        abort(403)
+    reg.payment_status = "paid"
+    create_notification(reg.user_id, "Payment verified", f"Your payment for {reg.event.title} was verified.")
+    flash("Payment marked as verified.", "success")
+    return redirect(request.referrer or url_for("organizer_dashboard"))
+
+
+@app.route("/api/payment/<int:event_id>/<int:registration_id>/verify", methods=["POST"])
+@role_required("student")
+def api_verify_qr_payment(event_id, registration_id):
+    # No payment gateway is wired up, so never report a payment as verified from the client.
+    return jsonify({"success": False, "status": "unavailable",
+                    "message": "Automatic payment verification is not available. Ask the organizer to verify your payment."}), 501
+
+
+# ---------------------------------------------------------------------------
+# Certificates
+# ---------------------------------------------------------------------------
+def _certificate_code(reg):
+    year = reg.event.date.year if reg.event and reg.event.date else utcnow().year
+    return f"CEMS-{year}-{reg.ticket_code}"
+
+
+def _certificate_info(reg):
+    return SimpleNamespace(
+        certificate_code=_certificate_code(reg),
+        achievement="Certificate of Participation",
+        issued_date=reg.checkin_time or reg.event.date,
+        verified=bool(reg.attended),
+        issuer=None,
+    )
+
+
+@app.route("/certificate/<int:registration_id>/preview")
+@login_required
+def certificate_preview(registration_id):
+    reg = Registration.query.get_or_404(registration_id)
+    if reg.user_id != current_user.id and current_user.role != "admin":
+        abort(403)
+    return redirect(url_for("verify_certificate", code=_certificate_code(reg)))
+
+
+@app.route("/verify-certificate")
+def verify_certificate():
+    code = request.args.get("code", "").strip()
+    cert = reg = None
+    if code:
+        ticket = code.rsplit("-", 1)[-1].upper() if code.upper().startswith("CEMS-") else code.upper()
+        reg = Registration.query.filter_by(ticket_code=ticket).first()
+        if reg and _certificate_code(reg).upper() == code.upper():
+            cert = _certificate_info(reg)
+        else:
+            reg = None
+    return render_template("verify_certificate.html", code=code, cert=cert, reg=reg, COLLEGE=COLLEGE)
+
+
+# ---------------------------------------------------------------------------
+# Faculty / teacher event management shortcuts
+# ---------------------------------------------------------------------------
+def _assigned_event_or_403(event_id):
+    event = Event.query.get_or_404(event_id)
+    if not EventFaculty.query.filter_by(faculty_id=current_user.id, event_id=event.id).first():
+        abort(403)
+    return event
+
+
+@app.route("/teacher/registrations")
+@role_required("faculty", "teacher")
+def teacher_manage_registrations():
+    return redirect(url_for("teacher_attendance"))
+
+
+@app.route("/teacher/qr-checkin")
+@role_required("faculty", "teacher")
+def teacher_qr_checkin():
+    return redirect(url_for("teacher_attendance"))
+
+
+@app.route("/teacher/certificates")
+@role_required("faculty", "teacher")
+def teacher_certificates():
+    return redirect(url_for("teacher_assigned_events"))
+
+
+@app.route("/teacher/reports")
+@role_required("faculty", "teacher")
+def teacher_reports():
+    return redirect(url_for("teacher_attendance_export"))
+
+
+@app.route("/faculty/event/<int:event_id>/complete", methods=["GET", "POST"])
+@role_required("faculty", "teacher")
+def faculty_complete_event(event_id):
+    event = _assigned_event_or_403(event_id)
+    if request.method == "POST":
+        event.status = "completed"
+        event.completed_by = current_user.id
+        event.completed_at = utcnow()
+        event.completion_notes = request.form.get("completion_notes", "").strip() or None
+        db.session.commit()
+        flash("Event marked as completed.", "success")
+        return redirect(url_for("faculty_event_summary", event_id=event.id))
+    return render_template("faculty/event_completion.html", event=event, **_event_summary_context(event))
+
+
+def _event_summary_context(event):
+    regs = list(event.registrations)
+    feedbacks = [f for r in regs for f in r.feedbacks]
+    ratings = [f.rating for f in feedbacks]
+    volunteers = Volunteer.query.filter_by(event_id=event.id).all()
+    certs = [SimpleNamespace(certificate_code=_certificate_code(r), registration=r) for r in regs if r.attended]
+    stats = SimpleNamespace(
+        total_registrations=len(regs),
+        approved_students=sum(1 for r in regs if r.status in ("confirmed", "approved")),
+        rejected_students=sum(1 for r in regs if r.status in ("rejected", "cancelled")),
+        waitlisted=sum(1 for r in regs if r.status == "waitlisted"),
+        present=sum(1 for r in regs if r.attended),
+        absent=sum(1 for r in regs if not r.attended),
+        late=0,
+        certificates_generated=len(certs),
+        feedback_responses=len(feedbacks),
+        average_feedback_rating=round(sum(ratings) / len(ratings), 2) if ratings else None,
+        volunteer_assignments=len(volunteers),
+    )
+    completer = db.session.get(User, event.completed_by) if event.completed_by else None
+    return dict(
+        registrations=regs, feedbacks=feedbacks, volunteers=volunteers, certs=certs, stats=stats,
+        faculty_list=list(event.faculty_assignments), completed_by_name=completer.name if completer else None,
+    )
+
+
+@app.route("/faculty/event/<int:event_id>/summary")
+@role_required("faculty", "teacher")
+def faculty_event_summary(event_id):
+    event = _assigned_event_or_403(event_id)
+    return render_template("faculty/event_summary.html", event=event, **_event_summary_context(event))
+
+
+@app.route("/faculty/completed-events")
+@role_required("faculty", "teacher")
+def faculty_completed_events():
+    assigned = EventFaculty.query.filter_by(faculty_id=current_user.id).all()
+    events = [a.event for a in assigned if a.event.status == "completed"]
+    for event in events:
+        completer = db.session.get(User, event.completed_by) if event.completed_by else None
+        event._completed_by_name = completer.name if completer else None
+    return render_template("faculty/completed_events.html", events=events, categories=sorted({e.category for e in events}),
+                           category="", date_filter="", sort="newest")
+
+
+@app.route("/faculty/event/<int:event_id>/report")
+@role_required("faculty", "teacher")
+def faculty_event_report(event_id):
+    _assigned_event_or_403(event_id)
+    return past_event_pdf(event_id) if Event.query.get_or_404(event_id).date < utcnow().date() else redirect(
+        url_for("faculty_event_summary", event_id=event_id))
+
+
+@app.route("/admin/events/<int:event_id>/cancellation", methods=["GET", "POST"])
+@role_required("admin")
+def admin_manage_cancellation(event_id):
+    flash("Cancellation requests are applied directly by organizers; nothing to review.", "info")
+    return redirect(url_for("admin_events"))
+
+
+@app.route("/admin/events/<int:event_id>/reschedule", methods=["GET", "POST"])
+@role_required("admin")
+def admin_manage_reschedule(event_id):
+    flash("Reschedules are applied directly by organizers; nothing to review.", "info")
+    return redirect(url_for("admin_events"))
+
+
+# ---------------------------------------------------------------------------
+# Organizer: feedback, QR scanner, past event report
+# ---------------------------------------------------------------------------
+@app.route("/organizer/feedback")
+@role_required("organizer")
+def organizer_feedback():
+    events = Event.query.filter_by(organizer_id=current_user.id).order_by(Event.date.desc()).all()
+    rows = [(e, [f for r in e.registrations for f in r.feedbacks]) for e in events]
+    return render_template("organizer/event_feedback.html", rows=rows, event=None)
+
+
+@app.route("/organizer/events/<int:event_id>/feedback")
+@role_required("organizer")
+def organizer_event_feedback(event_id):
+    event = Event.query.get_or_404(event_id)
+    if event.organizer_id != current_user.id:
+        abort(403)
+    rows = [(event, [f for r in event.registrations for f in r.feedbacks])]
+    return render_template("organizer/event_feedback.html", rows=rows, event=event)
+
+
+@app.route("/organizer/qr-scanner")
+@role_required("organizer")
+def qr_scanner():
+    return redirect(url_for("kiosk"))
+
+
+@app.route("/past-events/<int:event_id>/report.pdf")
+def past_event_pdf(event_id):
+    event = Event.query.get_or_404(event_id)
+    if event.date >= utcnow().date():
+        abort(404)
+    regs = list(event.registrations)
+    ratings = [f.rating for r in regs for f in r.feedbacks]
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    w, h = A4
+    c.setTitle(f"{event.title} report")
+    c.setFont("Helvetica-Bold", 20)
+    c.drawString(60, h - 80, event.title[:70])
+    c.setFont("Helvetica", 12)
+    lines = [
+        f"Category: {event.category}",
+        f"Date: {event.date.strftime('%d %B %Y')}",
+        f"Venue: {event.venue}",
+        f"Registrations: {len(regs)}",
+        f"Attended: {sum(1 for r in regs if r.attended)}",
+        f"Average rating: {round(sum(ratings) / len(ratings), 2) if ratings else 'N/A'}",
+    ]
+    y = h - 120
+    for line in lines:
+        c.drawString(60, y, line)
+        y -= 22
+    c.save()
+    buf.seek(0)
+    return send_file(buf, mimetype="application/pdf", as_attachment=True, download_name=f"event-{event.id}-report.pdf")
+
+
+# ---------------------------------------------------------------------------
+# Organizer: volunteer management
+# ---------------------------------------------------------------------------
+VOLUNTEER_ROLE_NAMES = ["Registration Desk", "Crowd Management", "Technical Support", "Hospitality", "Photography", "Stage Management"]
+
+
+def _parse_dt(value):
+    try:
+        return datetime.strptime(value, "%Y-%m-%dT%H:%M") if value else None
+    except ValueError:
+        return None
+
+
+def _own_event_or_403(event_id):
+    event = Event.query.get_or_404(event_id)
+    if event.organizer_id != current_user.id:
+        abort(403)
+    return event
+
+
+def _volunteer_redirect(event_id):
+    return redirect(url_for("organizer_volunteer_management", event_id=event_id))
+
+
+@app.route("/organizer/volunteer-management")
+@role_required("organizer")
+def organizer_volunteer_management():
+    events = Event.query.filter_by(organizer_id=current_user.id).order_by(Event.date.desc()).all()
+    event_id = request.args.get("event_id", type=int)
+    event = next((e for e in events if e.id == event_id), events[0] if events else None)
+    roles = applications = assignments = []
+    if event:
+        roles = VolunteerRole.query.filter_by(event_id=event.id).order_by(VolunteerRole.id).all()
+        role_ids = [r.id for r in roles]
+        if role_ids:
+            applications = VolunteerApplication.query.filter(VolunteerApplication.role_id.in_(role_ids)).order_by(VolunteerApplication.created_at.desc()).all()
+            assignments = VolunteerAssignment.query.filter(VolunteerAssignment.role_id.in_(role_ids)).order_by(VolunteerAssignment.id.desc()).all()
+    students = User.query.filter_by(role="student", is_active_account=True).order_by(User.name).all()
+    return render_template("organizer/volunteer_management.html", events=events, event=event, roles=roles,
+                           applications=applications, assignments=assignments, students=students,
+                           default_role_names=VOLUNTEER_ROLE_NAMES)
+
+
+@app.route("/organizer/events/<int:event_id>/volunteer-roles", methods=["POST"])
+@role_required("organizer")
+def organizer_create_volunteer_role(event_id):
+    event = _own_event_or_403(event_id)
+    name = request.form.get("name", "").strip()
+    if not name:
+        flash("Role name is required.", "danger")
+        return _volunteer_redirect(event.id)
+    db.session.add(VolunteerRole(
+        event_id=event.id, name=name[:120], description=request.form.get("description", "").strip() or None,
+        required_count=max(1, min(100, request.form.get("required_count", 1, type=int))),
+        active=request.form.get("active", "1") == "1"))
+    db.session.commit()
+    flash("Volunteer role created.", "success")
+    return _volunteer_redirect(event.id)
+
+
+@app.route("/organizer/volunteer-roles/<int:role_id>", methods=["POST"])
+@role_required("organizer")
+def organizer_update_volunteer_role(role_id):
+    role = VolunteerRole.query.get_or_404(role_id)
+    _own_event_or_403(role.event_id)
+    role.required_count = max(1, min(100, request.form.get("required_count", role.required_count, type=int)))
+    role.active = request.form.get("active", "1") == "1"
+    db.session.commit()
+    flash("Volunteer role updated.", "success")
+    return _volunteer_redirect(role.event_id)
+
+
+@app.route("/organizer/events/<int:event_id>/volunteers/assign", methods=["POST"])
+@role_required("organizer")
+def organizer_assign_volunteer(event_id):
+    event = _own_event_or_403(event_id)
+    role = VolunteerRole.query.filter_by(id=request.form.get("role_id", type=int), event_id=event.id).first()
+    student = User.query.filter_by(id=request.form.get("student_id", type=int), role="student").first()
+    if not role or not student:
+        flash("Choose a valid student and role.", "danger")
+        return _volunteer_redirect(event.id)
+    db.session.add(VolunteerAssignment(
+        role_id=role.id, student_id=student.id, notes=request.form.get("notes", "").strip() or None,
+        shift_start=_parse_dt(request.form.get("shift_start")), shift_end=_parse_dt(request.form.get("shift_end"))))
+    create_notification(student.id, "Volunteer assignment", f"You were assigned as {role.name} for {event.title}.")
+    flash("Volunteer assigned.", "success")
+    return _volunteer_redirect(event.id)
+
+
+@app.route("/organizer/volunteer-applications/<int:application_id>", methods=["POST"])
+@role_required("organizer")
+def organizer_review_application(application_id):
+    application = VolunteerApplication.query.get_or_404(application_id)
+    role = application.role
+    _own_event_or_403(role.event_id)
+    decision = request.form.get("decision")
+    if decision == "approve":
+        application.status = "approved"
+        application.shift_start = _parse_dt(request.form.get("shift_start")) or application.shift_start
+        application.shift_end = _parse_dt(request.form.get("shift_end")) or application.shift_end
+        db.session.add(VolunteerAssignment(role_id=role.id, student_id=application.student_id,
+                                           shift_start=application.shift_start, shift_end=application.shift_end,
+                                           notes=application.notes))
+    elif decision == "reject":
+        application.status = "rejected"
+    else:
+        abort(400)
+    create_notification(application.student_id, "Volunteer application",
+                        f"Your application for {role.name} was {application.status}.")
+    flash(f"Application {application.status}.", "success")
+    return _volunteer_redirect(role.event_id)
+
+
+@app.route("/organizer/volunteer-assignments/<int:assignment_id>", methods=["POST"])
+@role_required("organizer")
+def organizer_update_assignment(assignment_id):
+    assignment = VolunteerAssignment.query.get_or_404(assignment_id)
+    _own_event_or_403(assignment.role.event_id)
+    status = request.form.get("status", assignment.status)
+    if status not in ("assigned", "confirmed", "present", "completed", "cancelled", "removed"):
+        abort(400)
+    assignment.status = status
+    assignment.shift_start = _parse_dt(request.form.get("shift_start")) or assignment.shift_start
+    assignment.shift_end = _parse_dt(request.form.get("shift_end")) or assignment.shift_end
+    db.session.commit()
+    flash("Assignment updated.", "success")
+    return _volunteer_redirect(assignment.role.event_id)
+
+
+def _rate_limit_auth_routes():
+    """Throttle POSTs to login and registration endpoints (brute force / spam)."""
+    for rule in app.url_map.iter_rules():
+        if "POST" in rule.methods and ("login" in rule.rule or rule.rule.startswith("/register")):
+            view = app.view_functions[rule.endpoint]
+            if not getattr(view, "_auth_limited", False):
+                limited = limiter.limit("10 per minute", methods=["POST"])(view)
+                limited._auth_limited = True
+                app.view_functions[rule.endpoint] = limited
+
+
+_rate_limit_auth_routes()
+
 with app.app_context():
     seed_data()
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=_env_flag("FLASK_DEBUG", False), port=int(os.getenv("PORT", 5001)))

@@ -27,10 +27,29 @@ A GitHub-ready full-stack college project built with **HTML, CSS, JavaScript, Fl
 - Venue management + volunteer, judge and sponsor management
 - Responsive UI matching the supplied CEMS reference screens
 
+## Quick start (macOS / Linux)
+
+```bash
+cd CEMS-AGC
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env   # then set SECRET_KEY
+python app.py
+```
+
+Open http://127.0.0.1:5001 (port 5000 is taken by AirPlay on macOS; override with `PORT`). Run tests with `pytest`.
+
+## Production notes
+
+- `SECRET_KEY` is required when `FLASK_ENV=production`.
+- Demo accounts and demo payments are on by default in development only. Set `SEED_DEMO_DATA=false` and `ALLOW_DEMO_PAYMENTS=false` in production (already set in `render.yaml`).
+- Set `MAIL_SERVER` (and `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`) to send password-reset emails; otherwise the link is written to the server log.
+- Use a shared `RATE_LIMIT_STORAGE_URI` (e.g. Redis) when running several workers.
+
 ## Quick start — Windows
 
 ```powershell
-cd CEMS_AGC
+cd CEMS-AGC
 py -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
@@ -38,9 +57,9 @@ copy .env.example .env
 python app.py
 ```
 
-Open: http://127.0.0.1:5000
+Open: http://127.0.0.1:5001
 
-## Demo accounts
+## Demo accounts (development only)
 
 - Admin: `admin@agc.local` / `Admin@123`
 - Organizer: `organizer@agc.local` / `Organizer@123`
@@ -74,7 +93,7 @@ This project intentionally uses a **demo payment flow**. It does not collect rea
 ## Project structure
 
 ```text
-CEMS_AGC/
+CEMS-AGC/
 ├── app.py
 ├── requirements.txt
 ├── .env.example

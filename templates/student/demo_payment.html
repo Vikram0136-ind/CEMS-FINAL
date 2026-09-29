@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Payment — CEMS{% endblock %}
+{% block content %}
+<div class="cems-card" style="max-width:520px;margin:32px auto;">
+  <div class="cems-card-body">
+    <h1 class="cems-page-title">Demo payment</h1>
+    <p class="cems-page-description">No real money is charged. This is a development-only payment step.</p>
+    <p><strong>{{ event.title }}</strong><br>Amount: ₹{{ '%.2f'|format(event.fee) }}</p>
+    <form method="post">
+      <button type="submit" class="cems-btn cems-btn-primary">Complete demo payment</button>
+      <a href="{{ url_for('event_details', event_id=event.id) }}" class="cems-btn cems-btn-secondary">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}
