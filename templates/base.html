@@ -1,3 +1,8 @@
+{% from 'macros/icons.html' import icon %}
+{%- set public_endpoints = ['landing', 'about', 'contact', 'agc_module', 'agc_info', 'notice_detail', 'role_select', 'verify_certificate'] -%}
+{%- set role = (current_role or '') if current_user.is_authenticated else '' -%}
+{%- set app_shell = current_user.is_authenticated and request.endpoint not in public_endpoints -%}
+{%- set ep = request.endpoint or '' -%}
 <!doctype html>
 <html lang="en">
 <head>
@@ -5,181 +10,205 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>{% block title %}CEMS — {{ college_short }}{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', filename='images/agc-logo.svg') }}" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/categories.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/categories.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/features.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/role-workspace.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/cems-design.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/cems-layout.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/cems-components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/cems-app.css') }}">
+  {% block extra_css %}{% endblock %}
   {% block extra_head %}{% endblock %}
   <script defer src="{{ url_for('static', filename='js/csrf.js') }}"></script>
-  <script defer src="{{ url_for('static', filename='js/app.js') }}"></script>
-  <script defer src="{{ url_for('static', filename='js/theme.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/cems.js') }}"></script>
 </head>
-<body data-theme="blush">
-<header class="topbar">
-  <a class="brand" href="{{ url_for('landing') }}">
-    <img src="{{ url_for('static', filename='images/agc-logo.svg') }}" alt="AGC logo" class="brand-logo">
-    <span class="brand-text">CEMS <small>{{ college_short }}</small></span>
-  </a>
-<nav>
-  <!-- HOME -->
-  <a href="{{ url_for('landing') }}">Home</a>
+<body class="{% if app_shell %}cems-body-app{% else %}cems-body-public{% endif %}{% block body_class %}{% endblock %}">
 
-  <!-- EVENTS -->
-  <a href="{{ url_for('events') }}">Events</a>
+{% macro nav_link(endpoint, label, icon_name, active_eps=None) -%}
+  {%- set eps = active_eps if active_eps else [endpoint] -%}
+  <a class="cems-nav-item{% if ep in eps %} active{% endif %}" href="{{ url_for(endpoint) }}">{{ icon(icon_name) }}<span>{{ label }}</span></a>
+{%- endmacro %}
 
-  <!-- ABOUT -->
-  <a href="{{ url_for('about') }}">About Us</a>
-
-  <!-- ACADEMICS -->
-  <a href="{{ url_for('agc_module', slug='academics') }}">
-    Academics
-  </a>
-
-  <!-- ADMISSIONS -->
-  <a href="{{ url_for('agc_module', slug='admissions') }}">
-    Admissions
-  </a>
-
-  <!-- EXAMINATION -->
-  <a href="{{ url_for('agc_module', slug='examination') }}">
-    Examination
-  </a>
-
-  <!-- RESEARCH -->
-  <a href="{{ url_for('agc_module', slug='research') }}">
-    Research
-  </a>
-
-  <!-- PLACEMENT -->
-  <a href="{{ url_for('agc_module', slug='placement') }}">
-    Placement
-  </a>
-
-  <!-- CONTACT -->
-  <a href="{{ url_for('contact') }}">
-    Contact
-  </a>
-
-  {% if current_user.is_authenticated %}
-
-    <!-- DASHBOARD -->
-    <a class="nav-btn" href="{{ url_for('dashboard') }}">
-      Dashboard
-    </a>
-
-    <!-- LOGOUT -->
-    <a class="nav-btn outline" href="{{ url_for('logout') }}" data-logout>
-      Logout
-    </a>
-
-  {% else %}
-
-    <div class="theme-switcher" aria-label="Theme selector">
-      <label class="theme-switcher-label" for="themeSelect">Theme</label>
-      <select id="themeSelect" class="theme-select">
-        <option value="blush">Blush Pink</option>
-        <option value="lavender">Lavender Dream</option>
-        <option value="peach">Peach Cream</option>
-        <option value="rose">Rose Berry</option>
-        <option value="mint">Soft Mint</option>
-        <option value="sky">Sky Blue</option>
-      </select>
+{% if app_shell %}
+<div class="cems-app">
+  <div class="cems-sidebar-overlay" id="sidebar-scrim"></div>
+  <aside class="cems-sidebar" id="app-sidebar" aria-label="Main navigation">
+    <div class="cems-sidebar-header">
+      <div class="cems-sidebar-logo">C</div>
+      <div class="cems-sidebar-brand">CEMS<small>Event Management</small></div>
     </div>
+    <nav class="cems-sidebar-nav">
+      {% if role == 'student' %}
+      <div class="cems-sidebar-section">
+        <div class="cems-sidebar-section-title">Main</div>
+        {{ nav_link('student_dashboard', 'Dashboard', 'dashboard') }}
+        {{ nav_link('student_events', 'Discover Events', 'search', ['student_events', 'events', 'event_details', 'register_event', 'demo_payment']) }}
+        {{ nav_link('my_registrations', 'My Registrations', 'clipboard') }}
+        {{ nav_link('my_tickets', 'My Tickets', 'ticket', ['my_tickets', 'ticket']) }}
+        {{ nav_link('student_certificates', 'My Certificates', 'award', ['student_certificates', 'certificate_preview']) }}
+      </div>
+      <div class="cems-sidebar-section">
+        <div class="cems-sidebar-section-title">Explore</div>
+        {{ nav_link('notices', 'Notice Board', 'board', ['notices', 'board_notice_detail']) }}
+        {{ nav_link('past_events', 'Past Events', 'clock', ['past_events', 'past_event_detail']) }}
+        {{ nav_link('student_notifications', 'Notifications', 'bell') }}
+      </div>
+      <div class="cems-sidebar-section">
+        <div class="cems-sidebar-section-title">Account</div>
+        {{ nav_link('profile', 'Profile', 'user') }}
+      </div>
 
-    <!-- LOGIN -->
-    <a class="nav-btn outline" href="{{ url_for('login') }}">
-      Login
-    </a>
+      {% elif role == 'organizer' %}
+      <div class="cems-sidebar-section">
+        <div class="cems-sidebar-section-title">Main</div>
+        {{ nav_link('organizer_dashboard', 'Dashboard', 'dashboard') }}
+        {{ nav_link('create_event', 'Create Event', 'plus') }}
+      </div>
+      <div class="cems-sidebar-section">
+        <div class="cems-sidebar-section-title">Event Management</div>
+        {{ nav_link('organizer_reports', 'Reports', 'chart') }}
+        {{ nav_link('checkin', 'Check-in', 'check') }}
+        {{ nav_link('qr_scanner', 'QR Scanner', 'scan') }}
+        {{ nav_link('past_events', 'Past Events', 'clock', ['past_events', 'past_event_detail']) }}
+        {{ nav_link('notices', 'Notice Board', 'board', ['notices', 'board_notice_detail']) }}
+        {{ nav_link('faculty_notices', 'Faculty Notices', 'building', ['faculty_notices', 'faculty_notice_edit_form']) }}
+        {{ nav_link('festival_calendar', 'Festival Calendar', 'calendar') }}
+      </div>
+      <div class="cems-sidebar-section">
+        <div class="cems-sidebar-section-title">Resources</div>
+        <a class="cems-nav-item{% if ep == 'organizer_support' and request.view_args.module == 'volunteers' %} active{% endif %}" href="{{ url_for('organizer_support', module='volunteers') }}">{{ icon('users') }}<span>Volunteers</span></a>
+        <a class="cems-nav-item{% if ep == 'organizer_support' and request.view_args.module == 'judges' %} active{% endif %}" href="{{ url_for('organizer_support', module='judges') }}">{{ icon('gavel') }}<span>Judges</span></a>
+        <a class="cems-nav-item{% if ep == 'organizer_support' and request.view_args.module == 'sponsors' %} active{% endif %}" href="{{ url_for('organizer_support', module='sponsors') }}">{{ icon('coins') }}<span>Sponsors</span></a>
+        {{ nav_link('organizer_profile', 'My Profile', 'user') }}
+      </div>
 
-    <!-- REGISTER -->
-    <a class="nav-btn" href="{{ url_for('register') }}">
-      Register
-    </a>
+      {% elif role == 'faculty' %}
+      <div class="cems-sidebar-section">
+        <div class="cems-sidebar-section-title">Main</div>
+        {{ nav_link('faculty_dashboard', 'Dashboard', 'dashboard', ['faculty_dashboard', 'teacher_dashboard']) }}
+        {{ nav_link('faculty_assigned_events', 'Assigned Events', 'clipboard', ['faculty_assigned_events', 'teacher_assigned_events', 'teacher_event_details', 'faculty_complete_event', 'faculty_event_summary']) }}
+        {{ nav_link('teacher_attendance', 'Attendance', 'check') }}
+        {{ nav_link('faculty_completed_events', 'Completed Events', 'archive') }}
+      </div>
+      <div class="cems-sidebar-section">
+        <div class="cems-sidebar-section-title">Explore</div>
+        {{ nav_link('faculty_notices', 'Faculty Notices', 'building', ['faculty_notices', 'faculty_notice_edit_form']) }}
+        {{ nav_link('notices', 'Notice Board', 'board', ['notices', 'board_notice_detail']) }}
+        {{ nav_link('past_events', 'Past Events', 'clock', ['past_events', 'past_event_detail']) }}
+        {{ nav_link('festival_calendar', 'Festival Calendar', 'calendar') }}
+        {{ nav_link('user_notifications', 'Notifications', 'bell') }}
+      </div>
+      <div class="cems-sidebar-section">
+        <div class="cems-sidebar-section-title">Account</div>
+        {{ nav_link('faculty_profile', 'My Profile', 'user') }}
+      </div>
 
-  {% endif %}
-</nav>
-</header>
-
-{% set show_role_sidebar = current_user.is_authenticated and request.endpoint in ['student_dashboard', 'student_certificates', 'profile', 'student_resume_export', 'organizer_dashboard', 'organizer_profile', 'faculty_dashboard', 'teacher_dashboard', 'faculty_profile'] %}
-<div class="{% if show_role_sidebar %}cems-workspace-layout{% endif %}">
-  {% if show_role_sidebar %}
-  <aside class="cems-workspace-sidebar">
-    <div class="cems-workspace-brand"><strong>CEMS</strong><small>EVENT MANAGEMENT</small></div>
-    <nav aria-label="{{ current_user.role|title }} workspace">
-      {% if current_user.role == 'student' %}
-      <div class="cems-workspace-nav-group">
-        <span class="cems-workspace-nav-title">Main</span>
-        <a class="{% if request.endpoint == 'student_dashboard' %}active{% endif %}" href="{{ url_for('student_dashboard') }}">Dashboard</a>
-        <a href="{{ url_for('events') }}">Discover Events</a>
-        <a href="{{ url_for('my_registrations') }}">My Registrations</a>
-        <a href="{{ url_for('my_tickets') }}">My Tickets</a>
-        <a class="{% if request.endpoint == 'student_certificates' %}active{% endif %}" href="{{ url_for('student_certificates') }}">My Certificates</a>
-      </div>
-      <div class="cems-workspace-nav-group">
-        <span class="cems-workspace-nav-title">Explore</span>
-        <a href="{{ url_for('notices') }}">Notice Board</a>
-        <a href="{{ url_for('past_events') }}">Past Events</a>
-        <a href="{{ url_for('student_notifications') }}">Notifications</a>
-      </div>
-      <div class="cems-workspace-nav-group">
-        <span class="cems-workspace-nav-title">Account</span>
-        <a class="{% if request.endpoint == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">Profile</a>
-      </div>
-      {% elif current_user.role == 'organizer' %}
-      <div class="cems-workspace-nav-group">
-        <span class="cems-workspace-nav-title">Main</span>
-        <a class="{% if request.endpoint == 'organizer_dashboard' %}active{% endif %}" href="{{ url_for('organizer_dashboard') }}">Dashboard</a>
-        <a href="{{ url_for('create_event') }}">+ Create Event</a>
-      </div>
-      <div class="cems-workspace-nav-group">
-        <span class="cems-workspace-nav-title">Event Management</span>
-        <a href="{{ url_for('organizer_reports') }}">Reports</a>
-        <a href="{{ url_for('checkin') }}">Check-in</a>
-        <a href="{{ url_for('kiosk') }}">QR Scanner</a>
-        <a href="{{ url_for('past_events') }}">Past Events</a>
-        <a href="{{ url_for('notices') }}">Notice Board</a>
-        <a href="{{ url_for('notices') }}">Faculty Notices</a>
-        <a href="{{ url_for('festival_calendar') }}">Festival Calendar</a>
-      </div>
-      <div class="cems-workspace-nav-group">
-        <span class="cems-workspace-nav-title">Resources</span>
-        <a href="{{ url_for('organizer_support', module='volunteers') }}">Volunteer Coordination</a>
-        <a href="{{ url_for('organizer_support', module='judges') }}">Judges and Guests</a>
-        <a href="{{ url_for('organizer_support', module='sponsors') }}">Sponsor Ledger</a>
-        <a class="{% if request.endpoint == 'organizer_profile' %}active{% endif %}" href="{{ url_for('organizer_profile') }}">Profile</a>
-      </div>
       {% else %}
-      <div class="cems-workspace-nav-group">
-        <span class="cems-workspace-nav-title">Main</span>
-        <a class="{% if request.endpoint in ['faculty_dashboard', 'teacher_dashboard'] %}active{% endif %}" href="{{ url_for('faculty_dashboard') }}">Dashboard</a>
-        <a href="{{ url_for('faculty_assigned_events') }}">Assigned Events</a>
-        <a href="{{ url_for('notices') }}">Faculty Notices</a>
+      <div class="cems-sidebar-section">
+        <div class="cems-sidebar-section-title">Main</div>
+        {{ nav_link('admin_dashboard', 'Dashboard', 'dashboard') }}
+        {{ nav_link('admin_events', 'Events', 'calendar', ['admin_events', 'admin_manage_cancellation', 'admin_manage_reschedule']) }}
+        {{ nav_link('admin_users', 'Users', 'users') }}
+        {{ nav_link('admin_registrations', 'Registrations', 'clipboard') }}
       </div>
-      <div class="cems-workspace-nav-group">
-        <span class="cems-workspace-nav-title">Account</span>
-        <a class="{% if request.endpoint == 'faculty_profile' %}active{% endif %}" href="{{ url_for('faculty_profile') }}">Profile</a>
+      <div class="cems-sidebar-section">
+        <div class="cems-sidebar-section-title">Manage</div>
+        {{ nav_link('admin_venues', 'Venues', 'venue') }}
+        {{ nav_link('admin_reports', 'Reports', 'chart') }}
+        {{ nav_link('admin_notifications', 'Send Notifications', 'bell') }}
+        {{ nav_link('admin_notices', 'Notices', 'board', ['admin_notices', 'notices', 'board_notice_detail']) }}
       </div>
       {% endif %}
     </nav>
-  </aside>
-  {% endif %}
-  <main class="{% if current_user.is_authenticated %}app-shell{% endif %}{% if show_role_sidebar %} cems-workspace-main{% endif %}">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="flash-wrap">
-        {% for category, message in messages %}
-          <div class="flash {{ category }}">{{ message }} <button onclick="this.parentElement.remove()">×</button></div>
-        {% endfor %}
+    <div class="cems-sidebar-footer">
+      <a class="cems-sidebar-user" href="{{ url_for('profile_home') }}" title="My profile">
+        <div class="cems-sidebar-avatar">{{ current_user.name[:2]|upper }}</div>
+        <div class="cems-sidebar-user-info">
+          <div class="cems-sidebar-user-name">{{ current_user.name }}</div>
+          <div class="cems-sidebar-user-role">{{ role|title }}</div>
         </div>
-      {% endif %}
-    {% endwith %}
-    {% block content %}{% endblock %}
-  </main>
-</div>
+      </a>
+      <form method="post" action="{{ url_for('logout') }}" class="cems-logout-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="cems-logout-btn">{{ icon('logout', 18) }}<span>Logout</span></button>
+      </form>
+    </div>
+  </aside>
 
-<footer><strong>{{ college_name }}</strong> · CEMS — Campus Event Management System · {{ agc_profile.address }}<br><span>Academic project interface inspired by the institutional information supplied for AGC.</span></footer>
+  <div class="cems-main">
+    <header class="cems-header">
+      <div class="cems-header-left">
+        <button type="button" class="cems-icon-btn" id="sidebar-toggle" aria-label="Toggle navigation" aria-expanded="false">{{ icon('menu') }}</button>
+        <nav class="cems-breadcrumb" aria-label="Breadcrumb">
+          <a href="{{ url_for('dashboard') }}">Home</a>
+          <span class="cems-breadcrumb-separator">/</span>
+          <span class="cems-breadcrumb-current">{% block breadcrumb %}{% endblock %}</span>
+        </nav>
+      </div>
+      <div class="cems-header-right">
+        <form class="cems-search-box" method="get" action="{{ url_for('events') }}" role="search">
+          {{ icon('search', 18) }}
+          <input type="search" name="q" placeholder="Search... (Ctrl+K)" aria-label="Search events" autocomplete="off">
+        </form>
+        <div class="cems-header-actions">
+          <a class="cems-icon-btn" href="{{ url_for('user_notifications') }}" aria-label="Notifications">
+            {{ icon('bell') }}
+            {% if unread_notifications %}<span class="cems-badge">{{ unread_notifications if unread_notifications < 10 else '9+' }}</span>{% endif %}
+          </a>
+        </div>
+        <a class="cems-header-profile" href="{{ url_for('profile_home') }}">
+          <div class="cems-header-avatar">{{ current_user.name[:2]|upper }}</div>
+          <div class="cems-header-user-info">
+            <span class="cems-header-user-name">{{ current_user.name }}</span>
+            <span class="cems-header-user-role">{{ role }}</span>
+          </div>
+        </a>
+      </div>
+    </header>
+    <main class="cems-content">
+{% else %}
+{% block site_header %}
+<header class="cems-public-header">
+  <div class="cems-public-header-inner">
+    <a class="cems-public-brand" href="{{ url_for('landing') }}">
+      <img src="{{ url_for('static', filename='images/agc-logo.svg') }}" alt="AGC logo">
+      <span>CEMS</span>
+    </a>
+    <nav class="cems-public-nav" aria-label="Primary">
+      <a href="{{ url_for('landing') }}" class="{% if ep == 'landing' %}active{% endif %}">Home</a>
+      <a href="{{ url_for('events') }}" class="{% if ep in ['events', 'event_details'] %}active{% endif %}">Events</a>
+      {% if current_user.is_authenticated %}
+      <a href="{{ url_for('dashboard') }}">Dashboard</a>
+      <form method="post" action="{{ url_for('logout') }}" class="cems-inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="cems-public-link-btn">Logout</button>
+      </form>
+      {% else %}
+      <a href="{{ url_for('login') }}" class="{% if ep == 'login' %}active{% endif %}">Login</a>
+      <a href="{{ url_for('register') }}" class="cems-public-cta">Create Account</a>
+      {% endif %}
+    </nav>
+  </div>
+</header>
+{% endblock %}
+<main class="cems-public-main">
+{% endif %}
+      {% include 'partials/flash.html' %}
+      {% block content %}{% endblock %}
+{% if app_shell %}
+    </main>
+  </div>
+</div>
+{% else %}
+</main>
+{% block site_footer %}
+<footer class="cems-public-footer"><strong>{{ college_name }}</strong> · CEMS — Campus Event Management System</footer>
+{% endblock %}
+{% endif %}
+
 {% block extra_js %}{% endblock %}
 </body>
 </html>

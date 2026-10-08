@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ role|title }} Profile — CEMS{% endblock %}
+{% block breadcrumb %}Profile{% endblock %}
 {% block extra_head %}
 <style>
   .role-profile { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
@@ -8,7 +9,7 @@
   .role-profile-head p { margin: 0; color: #60717c; }
   .role-profile-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .role-profile-actions a, .role-profile-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 9px 14px; border: 1px solid #d8e2e8; border-radius: 6px; background: #fff; color: #273b47; font: inherit; font-size: .88rem; font-weight: 700; text-decoration: none; cursor: pointer; }
-  .role-profile-actions .primary { border-color: #0f766e; background: #0f766e; color: #fff; }
+  .role-profile-actions .primary { border-color: #6366f1; background: #6366f1; color: #fff; }
   .role-profile-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, .8fr); gap: 18px; align-items: start; }
   .role-profile-main, .role-profile-side { display: grid; gap: 18px; min-width: 0; }
   .role-panel { padding: 20px; border: 1px solid #dfe7ea; border-radius: 6px; background: #fff; }
@@ -16,17 +17,17 @@
   .role-panel h3 { margin: 0 0 5px; font-size: .92rem; color: #1d3440; }
   .role-panel p { margin: 0; color: #657780; font-size: .88rem; line-height: 1.55; }
   .role-profile-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
-  .role-profile-stat { padding: 14px; border: 1px solid #e1e9ec; border-radius: 6px; background: #f8fbfb; }
-  .role-profile-stat strong { display: block; margin-bottom: 4px; color: #0f766e; font-size: 1.35rem; }
+  .role-profile-stat { padding: 14px; border: 1px solid #e1e9ec; border-radius: 6px; background: #f8fafc; }
+  .role-profile-stat strong { display: block; margin-bottom: 4px; color: #6366f1; font-size: 1.35rem; }
   .role-profile-stat span { color: #657780; font-size: .76rem; }
   .role-profile-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
   .role-profile-fields label { display: grid; gap: 6px; margin: 0; color: #465a63; font-size: .82rem; font-weight: 700; }
   .role-profile-fields input, .role-profile-fields textarea { width: 100%; min-width: 0; padding: 10px 11px; border: 1px solid #d7e1e5; border-radius: 5px; background: #fff; color: #20343d; font: inherit; font-size: .9rem; }
   .role-profile-fields textarea { min-height: 86px; resize: vertical; }
   .role-profile-fields .full { grid-column: 1 / -1; }
-  .role-profile-badge { display: inline-flex; margin-top: 8px; padding: 5px 9px; border-radius: 4px; background: #e6f4f2; color: #0f766e; font-size: .76rem; font-weight: 800; }
+  .role-profile-badge { display: inline-flex; margin-top: 8px; padding: 5px 9px; border-radius: 4px; background: #eef2ff; color: #6366f1; font-size: .76rem; font-weight: 800; }
   .role-profile-photo { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
-  .role-profile-photo img, .role-profile-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: #e6f4f2; color: #0f766e; display: grid; place-items: center; font-weight: 800; font-size: 1.25rem; }
+  .role-profile-photo img, .role-profile-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: #eef2ff; color: #6366f1; display: grid; place-items: center; font-weight: 800; font-size: 1.25rem; }
   .role-profile-photo input { max-width: 300px; }
   .role-profile-list { display: grid; gap: 0; }
   .role-profile-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; padding: 12px 0; border-top: 1px solid #edf1f2; }
@@ -34,16 +35,16 @@
   .role-profile-row:last-child { padding-bottom: 0; }
   .role-profile-row strong { color: #293f49; font-size: .88rem; }
   .role-profile-row small { display: block; margin-top: 3px; color: #73848c; font-size: .76rem; }
-  .role-profile-value { flex: 0 0 auto; color: #0f766e; font-size: .83rem; font-weight: 800; }
+  .role-profile-value { flex: 0 0 auto; color: #6366f1; font-size: .83rem; font-weight: 800; }
   .role-profile-tags { display: flex; flex-wrap: wrap; gap: 7px; }
-  .role-profile-tag { padding: 5px 9px; border: 1px solid #cce4df; border-radius: 4px; background: #f0f8f6; color: #176d66; font-size: .76rem; font-weight: 700; }
+  .role-profile-tag { padding: 5px 9px; border: 1px solid #c7d2fe; border-radius: 4px; background: #eef2ff; color: #4f46e5; font-size: .76rem; font-weight: 700; }
   .role-profile-table-wrap { overflow-x: auto; }
   .role-profile-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
   .role-profile-table th, .role-profile-table td { padding: 10px 9px; border-bottom: 1px solid #edf1f2; text-align: left; white-space: nowrap; }
   .role-profile-table th { color: #64767e; font-size: .72rem; text-transform: uppercase; }
   .role-profile-table td { color: #30454e; }
   .role-profile-links { display: grid; gap: 8px; }
-  .role-profile-links a { color: #176d66; font-size: .85rem; font-weight: 700; text-decoration: none; }
+  .role-profile-links a { color: #4f46e5; font-size: .85rem; font-weight: 700; text-decoration: none; }
   .role-profile-links a:hover { text-decoration: underline; }
   .role-profile-hint { margin-top: 12px !important; font-size: .78rem !important; }
   @media (max-width: 820px) { .role-profile-grid { grid-template-columns: 1fr; } }
@@ -145,6 +146,24 @@
   </div>
   <div class="role-profile-grid">
     <div class="role-profile-main">
+      <form method="post" enctype="multipart/form-data" class="role-panel">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <h2>Edit Profile</h2>
+        <div class="role-profile-photo">
+          {% if profile.profile_image %}<img src="{{ url_for('static', filename=profile.profile_image) }}" alt="Profile photo">
+          {% else %}<div class="role-profile-avatar" aria-hidden="true">{{ current_user.name[:2]|upper }}</div>{% endif %}
+          <label>Profile photo <input type="file" name="profile_photo" accept="image/jpeg,image/png,image/webp"></label>
+        </div>
+        <div class="role-profile-fields">
+          <label class="full">Full Name<input name="name" value="{{ current_user.name }}" required></label>
+          <label class="full">Email Address<input value="{{ current_user.email }}" readonly></label>
+          <label>Mobile Number<input name="mobile" value="{{ current_user.mobile or '' }}"></label>
+          <label>Department<input name="department" value="{{ profile.department or current_user.department or '' }}"></label>
+          <label class="full">Title / Designation<input name="designation" value="{{ profile.designation or '' }}"></label>
+          <label class="full">Bio<textarea name="bio" placeholder="Short bio about yourself">{{ profile.bio or '' }}</textarea></label>
+        </div>
+        <div class="role-profile-actions" style="margin-top:16px"><button type="submit" class="primary">&#10003; Update Profile</button></div>
+      </form>
       <section class="role-panel">
         <h2>Organizer Credentials</h2>
         <div class="role-profile-list">
@@ -189,6 +208,24 @@
   </div>
   <div class="role-profile-grid">
     <div class="role-profile-main">
+      <form method="post" enctype="multipart/form-data" class="role-panel">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <h2>Edit Profile</h2>
+        <div class="role-profile-photo">
+          {% if profile.profile_image %}<img src="{{ url_for('static', filename=profile.profile_image) }}" alt="Profile photo">
+          {% else %}<div class="role-profile-avatar" aria-hidden="true">{{ current_user.name[:2]|upper }}</div>{% endif %}
+          <label>Profile photo <input type="file" name="profile_photo" accept="image/jpeg,image/png,image/webp"></label>
+        </div>
+        <div class="role-profile-fields">
+          <label class="full">Full Name<input name="name" value="{{ current_user.name }}" required></label>
+          <label class="full">Email Address<input value="{{ current_user.email }}" readonly></label>
+          <label>Mobile Number<input name="mobile" value="{{ current_user.mobile or '' }}"></label>
+          <label>Department<input name="department" value="{{ profile.department or current_user.department or '' }}"></label>
+          <label class="full">Title / Designation<input name="designation" value="{{ profile.designation or '' }}"></label>
+          <label class="full">Bio<textarea name="bio" placeholder="Short bio about yourself">{{ profile.bio or '' }}</textarea></label>
+        </div>
+        <div class="role-profile-actions" style="margin-top:16px"><button type="submit" class="primary">&#10003; Update Profile</button></div>
+      </form>
       <section class="role-panel">
         <h2>Faculty Credentials</h2>
         <div class="role-profile-list">

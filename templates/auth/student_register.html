@@ -1,319 +1,58 @@
 {% extends "base.html" %}
-{% block title %}Create Student Account — CEMS AGC{% endblock %}
-{% block extra_head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/student-portal.css') }}">
-{% endblock %}
+{% from 'auth/_fields.html' import field, select, photo_field, password_fields %}
+{% block title %}Student Registration — CEMS{% endblock %}
+{% block body_class %} cems-auth{% endblock %}
+{% block site_header %}{% endblock %}
+{% block site_footer %}{% endblock %}
+{% set semester_options = [('1','1st Semester'),('2','2nd Semester'),('3','3rd Semester'),('4','4th Semester'),('5','5th Semester'),('6','6th Semester'),('7','7th Semester'),('8','8th Semester')] %}
 {% block content %}
-<div class="sp-page">
-  <div class="sp-shell">
+<div class="cems-auth-stage">
+  <div class="cems-auth-card" style="--accent:#6366f1">
+    <div class="cems-auth-badge">S</div>
+    <h1 class="cems-auth-title">Student Registration</h1>
+    <p class="cems-auth-sub">Create your student account to access campus events and resources.</p>
 
-    <div class="sp-header">
-      <a class="sp-back" href="{{ url_for('register') }}">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-        Back to account type
-      </a>
+    <form method="post" action="{{ url_for('student_register_page') }}" enctype="multipart/form-data" data-register-form novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="cems-auth-form-error" role="alert"></div>
 
-      <div class="sp-brand">
-        <div class="sp-brand-logo">
-          <img src="{{ url_for('static', filename='images/agc-logo.svg') }}" alt="AGC logo">
-        </div>
-        <div class="sp-brand-name">
-          CEMS AGC
-          <small>Amritsar Group of Colleges</small>
-        </div>
+      <div class="cems-auth-section">Personal Information</div>
+      <div class="cems-auth-grid">
+        {{ field('name', 'Full Name', placeholder='Enter your full name', required=True, full=True, autocomplete='name') }}
+        {{ field('email', 'Email Address', type='email', placeholder='you@college.edu', required=True, autocomplete='email') }}
+        {{ field('mobile', 'Phone Number', type='tel', placeholder='+91 XXXXX XXXXX', autocomplete='tel') }}
+        {{ field('date_of_birth', 'Date of Birth', type='date', extra='max="' ~ today_iso ~ '"') }}
+        <div></div>
+        {{ photo_field() }}
       </div>
 
-      <span class="sp-eyebrow">Student portal</span>
-      <h1 class="sp-title">Create your Student Account</h1>
-      <p class="sp-subtitle">Access campus events, activities, and college resources — all in one place.</p>
-    </div>
-
-    <div class="sp-card">
-      <div class="sp-card-body">
-
-        <nav class="sp-stepper" id="student-stepper" aria-label="Registration progress">
-          <div class="sp-step active" data-step="1">
-            <div class="sp-step-circle"><span>1</span></div>
-            <span class="sp-step-label">Personal</span>
-          </div>
-          <div class="sp-step-connector"></div>
-          <div class="sp-step" data-step="2">
-            <div class="sp-step-circle"><span>2</span></div>
-            <span class="sp-step-label">ID</span>
-          </div>
-          <div class="sp-step-connector"></div>
-          <div class="sp-step" data-step="3">
-            <div class="sp-step-circle"><span>3</span></div>
-            <span class="sp-step-label">Academic</span>
-          </div>
-          <div class="sp-step-connector"></div>
-          <div class="sp-step" data-step="4">
-            <div class="sp-step-circle"><span>4</span></div>
-            <span class="sp-step-label">Security</span>
-          </div>
-        </nav>
-        <div class="sp-step-indicator" id="student-step-indicator">Step 1 of 4</div>
-
-        <div class="sp-errors" id="register-error-container" aria-live="polite" aria-atomic="false">
-          {% if errors %}
-          {% for field, msg in errors.items() %}
-          <div class="sp-error" data-field="{{ field }}">{{ msg }}</div>
-          {% endfor %}
-          {% endif %}
-        </div>
-
-        <form method="post" enctype="multipart/form-data" id="student-register-form" novalidate data-validate-url="{{ url_for('api_validate_registration_step') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-          <!-- ===== Step 1: Personal Information ===== -->
-          <div class="sp-section active" data-step="1">
-            <div class="sp-section-head">
-              <div class="sp-section-icon">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              </div>
-              <div>
-                <div class="sp-section-title">Personal Information</div>
-                <div class="sp-section-desc">Your basic details</div>
-              </div>
-            </div>
-            <div class="sp-grid">
-              <div class="sp-field sp-full">
-                <label class="sp-label" for="reg-name">Full Name <span class="sp-required">*</span></label>
-                <input type="text" name="name" id="reg-name" class="sp-control" placeholder="Enter your full name" autocomplete="name" required value="{{ request.form.get('name', '') }}">
-                <small class="sp-hint">Letters, spaces, hyphens, apostrophes and periods only</small>
-                {% if errors and 'name' in errors %}
-                <span class="sp-field-error" data-field="name">{{ errors['name'] }}</span>
-                {% endif %}
-              </div>
-              <div class="sp-field">
-                <label class="sp-label" for="reg-email">Email Address <span class="sp-required">*</span></label>
-                <input type="email" name="email" id="reg-email" class="sp-control" placeholder="you@college.edu" autocomplete="email" required value="{{ request.form.get('email', '') }}">
-                <small class="sp-hint">We'll send your ticket and notifications here</small>
-                {% if errors and 'email' in errors %}
-                <span class="sp-field-error" data-field="email">{{ errors['email'] }}</span>
-                {% endif %}
-              </div>
-              <div class="sp-field">
-                <label class="sp-label" for="reg-mobile">Phone Number <span class="sp-required">*</span></label>
-                <input type="tel" name="mobile" id="reg-mobile" class="sp-control" placeholder="+91 98765 43210" required value="{{ request.form.get('mobile', '') }}">
-                <small class="sp-hint">Indian mobile: 10 digits starting with 6, 7, 8 or 9</small>
-                {% if errors and 'mobile' in errors %}
-                <span class="sp-field-error" data-field="mobile">{{ errors['mobile'] }}</span>
-                {% endif %}
-              </div>
-              <div class="sp-field">
-                <label class="sp-label" for="reg-dob">Date of Birth <span class="sp-required">*</span></label>
-                <input type="date" name="date_of_birth" id="reg-dob" class="sp-control" required max="{{ today_iso }}" value="{{ request.form.get('date_of_birth', '') }}">
-                <small class="sp-hint">Must be at least 13 years old and not a future date</small>
-                {% if errors and 'date_of_birth' in errors %}
-                <span class="sp-field-error" data-field="date_of_birth">{{ errors['date_of_birth'] }}</span>
-                {% endif %}
-              </div>
-              <div class="sp-field sp-full">
-                <label class="sp-label">Profile Photo <span class="sp-optional">Optional</span></label>
-                <div class="sp-photo" id="photo-upload-area" data-photo-dropzone>
-                  <input type="file" name="profile_photo" id="reg-photo" class="sp-photo-input" accept="image/jpeg,image/png,image/webp,image/gif">
-                  <div class="sp-photo-placeholder" id="photo-placeholder">
-                    <svg class="sp-photo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    <span class="sp-photo-hint">Click or drag an image to upload</span>
-                  </div>
-                  <img class="sp-photo-preview" id="photo-preview" src="" alt="Profile preview">
-                  <button type="button" class="sp-photo-remove" id="photo-remove" aria-label="Remove photo preview">×</button>
-                </div>
-                <small class="sp-hint">Accepted: JPG, PNG, WEBP, GIF — max 2 MB</small>
-                {% if errors and 'profile_photo' in errors %}
-                <span class="sp-field-error" data-field="profile_photo">{{ errors['profile_photo'] }}</span>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-
-          <!-- ===== Step 2: Student Identification ===== -->
-          <div class="sp-section" data-step="2">
-            <div class="sp-section-head">
-              <div class="sp-section-icon identification">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 10h8M8 14h5"/><circle cx="16" cy="10" r="1.5"/></svg>
-              </div>
-              <div>
-                <div class="sp-section-title">Student Identification</div>
-                <div class="sp-section-desc">Your college credentials</div>
-              </div>
-            </div>
-            <div class="sp-grid">
-              <div class="sp-field">
-                <label class="sp-label" for="reg-student-id">Student ID <span class="sp-required">*</span></label>
-                <input type="text" name="student_id" id="reg-student-id" class="sp-control" placeholder="e.g. 21CS1001" required value="{{ request.form.get('student_id', '') }}">
-                {% if errors and 'student_id' in errors %}
-                <span class="sp-field-error" data-field="student_id">{{ errors['student_id'] }}</span>
-                {% endif %}
-              </div>
-              <div class="sp-field">
-                <label class="sp-label" for="reg-roll-no">Roll Number <span class="sp-required">*</span></label>
-                <input type="text" name="roll_no" id="reg-roll-no" class="sp-control" placeholder="e.g. 21CS1001" required value="{{ request.form.get('roll_no', '') }}">
-                {% if errors and 'roll_no' in errors %}
-                <span class="sp-field-error" data-field="roll_no">{{ errors['roll_no'] }}</span>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-
-          <!-- ===== Step 3: Academic Information ===== -->
-          <div class="sp-section" data-step="3">
-            <div class="sp-section-head">
-              <div class="sp-section-icon academic">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1 2.5 3 6 3s6-2 6-3v-5"/></svg>
-              </div>
-              <div>
-                <div class="sp-section-title">Academic Information</div>
-                <div class="sp-section-desc">Your program and semester</div>
-              </div>
-            </div>
-            <div class="sp-grid">
-              <div class="sp-field">
-                <label class="sp-label" for="reg-course">Course / Program <span class="sp-required">*</span></label>
-                <select name="course" id="reg-course" class="sp-control sp-select" required>
-                  <option value="">Select Course</option>
-                  <option value="B.Tech" {% if request.form.get('course') == 'B.Tech' %}selected{% endif %}>B.Tech</option>
-                  <option value="BCA" {% if request.form.get('course') == 'BCA' %}selected{% endif %}>BCA</option>
-                  <option value="B.Sc" {% if request.form.get('course') == 'B.Sc' %}selected{% endif %}>B.Sc</option>
-                  <option value="B.Com" {% if request.form.get('course') == 'B.Com' %}selected{% endif %}>B.Com</option>
-                  <option value="BBA" {% if request.form.get('course') == 'BBA' %}selected{% endif %}>BBA</option>
-                  <option value="MBA" {% if request.form.get('course') == 'MBA' %}selected{% endif %}>MBA</option>
-                  <option value="MCA" {% if request.form.get('course') == 'MCA' %}selected{% endif %}>MCA</option>
-                  <option value="Other" {% if request.form.get('course') == 'Other' %}selected{% endif %}>Other</option>
-                </select>
-                {% if errors and 'course' in errors %}
-                <span class="sp-field-error" data-field="course">{{ errors['course'] }}</span>
-                {% endif %}
-              </div>
-              <div class="sp-field">
-                <label class="sp-label" for="reg-department">Department</label>
-                <input type="text" name="department" id="reg-department" class="sp-control" placeholder="e.g. Computer Science" value="{{ request.form.get('department', '') }}">
-                {% if errors and 'department' in errors %}
-                <span class="sp-field-error" data-field="department">{{ errors['department'] }}</span>
-                {% endif %}
-              </div>
-              <div class="sp-field">
-                <label class="sp-label" for="reg-semester">Semester <span class="sp-required">*</span></label>
-                <select name="semester" id="reg-semester" class="sp-control sp-select" required>
-                  <option value="">Select Semester</option>
-                  <option value="1" {% if request.form.get('semester') == '1' %}selected{% endif %}>1st Semester</option>
-                  <option value="2" {% if request.form.get('semester') == '2' %}selected{% endif %}>2nd Semester</option>
-                  <option value="3" {% if request.form.get('semester') == '3' %}selected{% endif %}>3rd Semester</option>
-                  <option value="4" {% if request.form.get('semester') == '4' %}selected{% endif %}>4th Semester</option>
-                  <option value="5" {% if request.form.get('semester') == '5' %}selected{% endif %}>5th Semester</option>
-                  <option value="6" {% if request.form.get('semester') == '6' %}selected{% endif %}>6th Semester</option>
-                  <option value="7" {% if request.form.get('semester') == '7' %}selected{% endif %}>7th Semester</option>
-                  <option value="8" {% if request.form.get('semester') == '8' %}selected{% endif %}>8th Semester</option>
-                </select>
-                {% if errors and 'semester' in errors %}
-                <span class="sp-field-error" data-field="semester">{{ errors['semester'] }}</span>
-                {% endif %}
-              </div>
-              <div class="sp-field">
-                <label class="sp-label" for="reg-section">Section</label>
-                <input type="text" name="section" id="reg-section" class="sp-control" placeholder="e.g. A" value="{{ request.form.get('section', '') }}">
-                {% if errors and 'section' in errors %}
-                <span class="sp-field-error" data-field="section">{{ errors['section'] }}</span>
-                {% endif %}
-              </div>
-              <div class="sp-field">
-                <label class="sp-label" for="reg-academic-session">Academic Session <span class="sp-required">*</span></label>
-                <select name="academic_session" id="reg-academic-session" class="sp-control sp-select" required>
-                  <option value="">Select Academic Session</option>
-                  {% for session in academic_sessions %}
-                  <option value="{{ session }}" {% if request.form.get('academic_session') == session %}selected{% endif %}>{{ session }}</option>
-                  {% endfor %}
-                </select>
-                {% if errors and 'academic_session' in errors %}
-                <span class="sp-field-error" data-field="academic_session">{{ errors['academic_session'] }}</span>
-                {% endif %}
-              </div>
-              <div class="sp-field">
-                <label class="sp-label" for="reg-batch">Batch <span class="sp-required">*</span></label>
-                <input type="text" name="batch" id="reg-batch" class="sp-control" placeholder="e.g. 2024 or 2024–2028" required maxlength="20" value="{{ request.form.get('batch', '') }}">
-                <small class="sp-hint">Your admission or cohort year</small>
-                {% if errors and 'batch' in errors %}
-                <span class="sp-field-error" data-field="batch">{{ errors['batch'] }}</span>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-
-          <!-- ===== Step 4: Account Security ===== -->
-          <div class="sp-section" data-step="4">
-            <div class="sp-section-head">
-              <div class="sp-section-icon security">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-              </div>
-              <div>
-                <div class="sp-section-title">Account Security</div>
-                <div class="sp-section-desc">Secure your account</div>
-              </div>
-            </div>
-            <div class="sp-grid">
-              <div class="sp-field sp-full">
-                <label class="sp-label" for="reg-password">Password <span class="sp-required">*</span></label>
-                <div class="sp-pw">
-                  <input type="password" name="password" id="reg-password" class="sp-control" placeholder="Create a strong password" required minlength="8" autocomplete="new-password">
-                  <button type="button" class="sp-pw-toggle" aria-label="Show password" aria-pressed="false" data-target="reg-password">
-                    <svg class="sp-eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    <svg class="sp-eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94m6.72 1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"/></svg>
-                  </button>
-                </div>
-                <div class="sp-pw-strength" id="pw-strength">
-                  <div class="sp-pw-bar"><div class="sp-pw-fill" id="pw-strength-fill"></div></div>
-                  <div class="sp-pw-label" id="pw-strength-label"></div>
-                </div>
-                <div class="sp-pw-reqs">
-                  <ul>
-                    <li id="req-length" class="sp-pw-req">Minimum 8 characters</li>
-                    <li id="req-letter" class="sp-pw-req">At least one letter (A–Z or a–z)</li>
-                    <li id="req-number" class="sp-pw-req">At least one number (0–9)</li>
-                    <li id="req-special" class="sp-pw-req">At least one special character (!@#$%^&*)</li>
-                  </ul>
-                </div>
-                {% if errors and 'password' in errors %}
-                <span class="sp-field-error" data-field="password">{{ errors['password'] }}</span>
-                {% endif %}
-              </div>
-              <div class="sp-field sp-full">
-                <label class="sp-label" for="reg-confirm-password">Confirm Password <span class="sp-required">*</span></label>
-                <div class="sp-pw">
-                  <input type="password" name="confirm_password" id="reg-confirm-password" class="sp-control" placeholder="Confirm your password" required minlength="8" autocomplete="new-password">
-                  <button type="button" class="sp-pw-toggle" aria-label="Show password" aria-pressed="false" data-target="reg-confirm-password">
-                    <svg class="sp-eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    <svg class="sp-eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94m6.72 1.07a3 3 0 1 1-4.24-4.24M1 1l22 22"/></svg>
-                  </button>
-                </div>
-                <span class="sp-pw-hint mismatch" id="pw-mismatch">Passwords do not match.</span>
-                <span class="sp-pw-hint match" id="pw-match">Passwords match.</span>
-                {% if errors and 'confirm_password' in errors %}
-                <span class="sp-field-error" data-field="confirm_password">{{ errors['confirm_password'] }}</span>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-
-          <!-- Navigation -->
-          <div class="sp-nav">
-            <button type="button" class="sp-btn sp-btn-secondary sp-nav-btn" id="student-step-back" style="display: none;">Back</button>
-            <button type="button" class="sp-btn sp-btn-primary sp-nav-btn" id="student-step-next">Next</button>
-          </div>
-          <button type="submit" class="sp-submit" id="student-register-submit" style="display: none;">
-            <span class="sp-submit-label">Create Student Account</span>
-            <span class="sp-submit-progress" aria-hidden="true"></span>
-          </button>
-        </form>
-
-        <div class="sp-footer">
-          Already have an account? <a href="{{ url_for('student_login') }}">Sign in</a>
-        </div>
+      <div class="cems-auth-section">Student Identification</div>
+      <div class="cems-auth-grid">
+        {{ field('student_id', 'Student ID', placeholder='e.g. 21CS1001', required=True) }}
+        {{ field('roll_no', 'Roll Number', placeholder='e.g. 21CS1001', required=True) }}
       </div>
+
+      <div class="cems-auth-section">Academic Information</div>
+      <div class="cems-auth-grid">
+        {{ select('course', 'Course / Program', courses, 'Select Course', required=True) }}
+        {{ field('department', 'Department', placeholder='e.g. Computer Science') }}
+        {{ select('semester', 'Semester', semester_options, 'Select Semester', required=True) }}
+        {{ field('section', 'Section', placeholder='e.g. A') }}
+        {{ select('academic_session', 'Academic Session / Batch', academic_sessions, 'Select Academic Session', required=True, full=True) }}
+      </div>
+
+      <div class="cems-auth-section">Account Security</div>
+      <div class="cems-auth-grid">
+        {{ password_fields() }}
+      </div>
+
+      <button type="submit" class="cems-auth-submit">Create Student Account</button>
+    </form>
+
+    <div class="cems-auth-links">
+      <span>Already have an account? <a href="{{ url_for('login') }}">Sign in</a></span>
     </div>
   </div>
 </div>
 {% endblock %}
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/student-register.js') }}" defer></script>
-{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/register.js') }}"></script>{% endblock %}

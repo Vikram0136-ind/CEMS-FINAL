@@ -47,7 +47,7 @@
       <div>
         <div style="font-size: 12px; color: var(--cems-text-secondary); font-weight: 700; text-transform: uppercase;">Registrations</div>
         <div style="margin-top: 4px;">
-          {{ event.registrations|selectattr('status', 'notequalto', 'cancelled')|list|length }} active
+          {{ event.registrations|selectattr('status', 'ne', 'cancelled')|list|length }} active
           ({{ event.registrations|length }} total)
         </div>
       </div>
@@ -65,7 +65,7 @@
   <div class="cems-card-header">
     <div class="cems-card-title">Registration Impact</div>
     <div class="cems-card-subtitle">
-      Approving cancellation will cancel {{ event.registrations|selectattr('status', 'notequalto', 'cancelled')|list|length }} active registration(s)
+      Approving cancellation will cancel {{ event.registrations|selectattr('status', 'ne', 'cancelled')|list|length }} active registration(s)
       and notify all affected students.
     </div>
   </div>

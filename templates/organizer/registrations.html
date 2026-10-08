@@ -1,138 +1,51 @@
 {% extends "base.html" %}
 {% block title %}Registrations — CEMS{% endblock %}
+{% block breadcrumb %}Registrations{% endblock %}
+
 {% block content %}
-<div class="dashboard">
-  <aside class="sidebar">
-    <div class="side-brand"><strong>🎪 CEMS</strong><span>Organizer Panel</span></div>
-    <nav>
-      <a href="{{ url_for('organizer_dashboard') }}">📊 Dashboard</a>
-      <a href="{{ url_for('create_event') }}">➕ Create Event</a>
-      <a class="active" href="{{ url_for('organizer_reports') }}">📈 Reports</a>
-    </nav>
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">Event Management</div>
-      <a href="{{ url_for('checkin') }}">✅ Check-in</a>
+{% set checked_in = registrations|selectattr('attended')|list|length %}
+{% set paid = registrations|selectattr('payment_status', 'in', ['paid', 'successful'])|list|length %}
+<div class="cems-page-header">
+  <div class="cems-page-header-top">
+    <div>
+      <h1 class="cems-page-title">{{ event.title }}</h1>
+      <p class="cems-page-description">Registrations and attendance for this event.</p>
     </div>
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">Resources</div>
-      <a href="{{ url_for('organizer_support', module='volunteers') }}">👥 Volunteers</a>
-      <a href="{{ url_for('organizer_support', module='judges') }}">⭐ Judges</a>
-      <a href="{{ url_for('organizer_support', module='sponsors') }}">💰 Sponsors</a>
+    <div class="cems-page-actions">
+      <a class="cems-btn cems-btn-secondary" href="{{ url_for('checkin') }}">Check-in</a>
+      <a class="cems-btn cems-btn-secondary" href="{{ url_for('qr_scanner') }}">QR Scanner</a>
+      <a class="cems-btn cems-btn-primary" href="{{ url_for('export_event_registrations', event_id=event.id) }}">Export CSV</a>
     </div>
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">Account</div>
-      <a href="{{ url_for('profile') }}">👤 Profile</a>
-      <a href="{{ url_for('logout') }}" data-logout>🚪 Logout</a>
-    </div>
-  </aside>
+  </div>
+</div>
 
-  <section class="dash-main">
-    <div class="dash-head">
-      <div>
-        <h1>{{ event.title }} 📝</h1>
-        <p style="color: #7b8495; margin: 5px 0 0;">Registrations & attendance</p>
-      </div>
-      <div style="display: flex; gap: 10px;">
-        <a class="btn" href="{{ url_for('checkin') }}">✅ Check-in</a>
-        <a class="btn" href="{{ url_for('qr_scanner') }}">📷 QR Scanner</a>
-        <a class="btn outline" href="{{ url_for('export_event_registrations', event_id=event.id) }}" style="background: var(--cems-info); color: white; border: none;">📥 Export CSV</a>
-      </div>
-    </div>
+<div class="cems-stats-grid">
+  <div class="cems-stat-card"><div class="cems-stat-content"><div class="cems-stat-value">{{ registrations|length }}</div><div class="cems-stat-label">Total Registrations</div></div></div>
+  <div class="cems-stat-card"><div class="cems-stat-content"><div class="cems-stat-value">{{ checked_in }}</div><div class="cems-stat-label">Checked In</div></div></div>
+  <div class="cems-stat-card"><div class="cems-stat-content"><div class="cems-stat-value">{{ paid }}</div><div class="cems-stat-label">Paid Registrations</div></div></div>
+  <div class="cems-stat-card"><div class="cems-stat-content"><div class="cems-stat-value">{{ ((checked_in * 100 / registrations|length)|round|int) if registrations else 0 }}%</div><div class="cems-stat-label">Attendance Rate</div></div></div>
+</div>
 
-    <div class="stats">
-      <div class="stat-card">
-        <div class="stat-icon">📝</div>
-        <div class="stat-value">{{ registrations|length }}</div>
-        <div class="stat-label">Total Registrations</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">✅</div>
-        <div class="stat-value">{{ registrations|selectattr('attended', 'equalto', True)|list|length }}</div>
-        <div class="stat-label">Checked In</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">💰</div>
-        <div class="stat-value">{{ registrations|selectattr('payment_status', 'equalto', 'paid')|list|length }}</div>
-        <div class="stat-label">Paid Registrations</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">⏳</div>
-        <div class="stat-value">{{ registrations|selectattr('payment_status', 'equalto', 'awaiting_verification')|list|length }}</div>
-        <div class="stat-label">Awaiting Verification</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon">📊</div>
-        <div class="stat-value">{{ '%.0f'|format((registrations|selectattr('attended', 'equalto', True)|list|length / registrations|length * 100) if registrations else 0) }}%</div>
-        <div class="stat-label">Attendance Rate</div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-head">
-        <div>
-          <span class="eyebrow">EVENT DETAILS</span>
-          <h2>Registered Participants</h2>
-        </div>
-      </div>
-
-      <div style="overflow-x: auto;">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Ticket Code</th>
-              <th>Payment Status</th>
-              <th>Check-in Status</th>
-              <th>Registration Date</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for r in registrations %}
-            <tr>
-              <td><strong>{{ r.user.name }}</strong></td>
-              <td>{{ r.user.email }}</td>
-              <td><code style="background: #f0f2f7; padding: 4px 8px; border-radius: 4px;">{{ r.ticket_code }}</code></td>
-              <td>
-                {% if r.payment_status == 'paid' %}
-                <span class="status-badge approved">✅ Paid</span>
-                {% elif r.payment_status == 'awaiting_verification' %}
-                <span class="status-badge warning">⏳ Awaiting Verification</span>
-                {% elif r.payment_status == 'pending' %}
-                <span class="status-badge pending">⏳ Pending</span>
-                {% else %}
-                <span class="status-badge">{{ r.payment_status|title }}</span>
-                {% endif %}
-              </td>
-              <td>
-                {% if r.attended %}
-                <span class="status-badge approved">✅ Checked In</span>
-                {% else %}
-                <span class="status-badge pending">⏳ Pending</span>
-                {% endif %}
-              </td>
-              <td>{{ r.registered_at.strftime('%d %b %Y • %I:%M %p') }}</td>
-              <td>
-                {% if r.payment_status == 'awaiting_verification' %}
-                <form method="post" action="{{ url_for('api_verify_payment_organizer', registration_id=r.id) }}" style="display: inline;">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button type="submit" class="cems-btn cems-btn-success cems-btn-sm" onclick="return confirm('Confirm this payment has been received?');">✅ Verify Payment</button>
-                </form>
-                {% elif r.payment_status == 'pending' and r.payment_record %}
-                <span style="font-size: 0.8rem; color: var(--cems-text-muted);">Waiting for payment</span>
-                {% endif %}
-              </td>
-            </tr>
-            {% else %}
-            <tr>
-              <td colspan="7" style="text-align: center; padding: 30px;">No registrations yet.</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
+<div class="cems-card">
+  <div class="cems-card-header"><div class="cems-card-title">Registered Participants</div></div>
+  <div class="cems-overflow-x-auto">
+    <table class="cems-table">
+      <thead><tr><th>Name</th><th>Email</th><th>Ticket Code</th><th>Payment</th><th>Check-in</th><th>Registered</th></tr></thead>
+      <tbody>
+        {% for r in registrations %}
+        <tr>
+          <td><strong>{{ r.user.name }}</strong></td>
+          <td>{{ r.user.email }}</td>
+          <td><code>{{ r.ticket_code }}</code></td>
+          <td><span class="cems-badge {{ 'cems-badge-success' if r.payment_status in ('paid', 'successful') else 'cems-badge-neutral' }}">{{ payment_display_status(r.payment_status) }}</span></td>
+          <td><span class="cems-badge {{ 'cems-badge-success' if r.attended else 'cems-badge-warning' }}">{{ 'Checked In' if r.attended else 'Pending' }}</span></td>
+          <td>{{ r.registered_at.strftime('%d %b %Y, %I:%M %p') if r.registered_at else '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;padding:36px;color:var(--cems-text-muted)">No registrations yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

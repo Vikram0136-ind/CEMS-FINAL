@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Event Feedback — CEMS{% endblock %}
+{% block breadcrumb %}Feedback{% endblock %}
+{% block content %}
+<div class="cems-page-header">
+  <div class="cems-page-header-top">
+    <div>
+      <h1 class="cems-page-title">{{ 'Your Feedback' if existing else 'Share Your Feedback' }}</h1>
+      <p class="cems-page-description">{{ reg.event.title }} · {{ reg.event.date.strftime('%d %b %Y') if reg.event.date else '' }}</p>
+    </div>
+  </div>
+</div>
+<div class="cems-card" style="max-width:640px">
+  <div class="cems-card-body">
+    {% if existing %}
+    <p style="font-size:1.6rem;color:var(--cems-warning)">{% for i in range(1, 6) %}{{ '★' if i <= existing.rating else '☆' }}{% endfor %}</p>
+    <p style="margin-top:12px">{{ existing.comment or 'No comment left.' }}</p>
+    <a href="{{ url_for('student_feedback_list') }}" class="cems-btn cems-btn-outline" style="margin-top:20px">Back to feedback</a>
+    {% else %}
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="cems-form-group">
+        <label class="cems-form-label" for="rating">Rating</label>
+        <select id="rating" name="rating" class="cems-form-select" required>
+          {% for n in [5, 4, 3, 2, 1] %}<option value="{{ n }}">{{ n }} — {{ ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'][n] }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="cems-form-group">
+        <label class="cems-form-label" for="comment">Comments</label>
+        <textarea id="comment" name="comment" rows="4" class="cems-form-input" placeholder="What went well? What could be better?"></textarea>
+      </div>
+      <button type="submit" class="cems-btn cems-btn-primary">Submit Feedback</button>
+      <a href="{{ url_for('student_feedback_list') }}" class="cems-btn cems-btn-outline">Cancel</a>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

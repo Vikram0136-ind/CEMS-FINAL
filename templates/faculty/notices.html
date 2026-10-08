@@ -67,21 +67,13 @@
 <div class="cems-card-grid">
   {% for notice in notices %}
   <article class="cems-notice-card">
-    {% if notice.image %}
     <div class="cems-notice-card-image-wrapper">
-      <img src="{{ image_url(notice.image) }}"
+      <img src="{{ image_url(notice.image) if notice.image else category_banner_url(notice.category) }}"
            alt="{{ notice.title }}"
            class="cems-notice-card-image"
            loading="lazy"
            onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/placeholder.svg') }}';">
     </div>
-    {% else %}
-    <div class="cems-notice-card-image-wrapper">
-      <div class="cems-notice-card-image cems-notice-placeholder">
-        <span class="cems-notice-placeholder-icon">{{ notice.category[:1] }}</span>
-      </div>
-    </div>
-    {% endif %}
     <div class="cems-notice-card-body">
       <span class="cems-notice-card-category">{{ notice.category }}</span>
       <h3 class="cems-notice-card-title">{{ notice.title }}</h3>
@@ -93,13 +85,15 @@
           📅 {{ notice.published_at.strftime('%d %b %Y') }}
         </span>
       </div>
+      {% if can_manage_notice(notice) %}
       <div style="margin-top:12px;display:flex;gap:8px;">
-        <button type="button" onclick="location.href='{{ url_for('faculty_notice_edit_form', notice_id=notice.id) }}'" class="cems-btn cems-btn-secondary cems-btn-sm">Edit</button>
+        <a href="{{ url_for('faculty_notice_edit_form', notice_id=notice.id) }}" class="cems-btn cems-btn-secondary cems-btn-sm">Edit</a>
         <form method="post" action="{{ url_for('faculty_notice_delete', notice_id=notice.id) }}" style="display:inline;" onsubmit="return confirm('Delete this notice?');">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="cems-btn cems-btn-danger cems-btn-sm">Delete</button>
         </form>
       </div>
+      {% endif %}
     </div>
   </article>
   {% endfor %}

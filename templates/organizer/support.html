@@ -1,19 +1,63 @@
 {% extends "base.html" %}
 {% block title %}{{ module|title }} — CEMS{% endblock %}
+{% block breadcrumb %}{{ module|title }}{% endblock %}
+{% set singular = module[:-1]|title %}
 {% block content %}
-<div class="narrow-wide">
-  <h1>{{ module|title }} Management</h1>
-  <form method="post" class="form-card inline-card"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label>Name<input name="name" required></label>
-    <div class="form-grid"><label>Email / Contact<input name="{{ 'email' if module != 'sponsors' else 'contact' }}"></label><label>Event<select name="event_id" required>{% for e in events %}<option value="{{ e.id }}">{{ e.title }}</option>{% endfor %}</select></label></div>
-    {% if module == 'volunteers' %}<label>Task<input name="task" placeholder="Registration desk / stage / help desk"></label>
-    {% elif module == 'judges' %}<label>Evaluation Criteria<input name="criteria" placeholder="Innovation, presentation, accuracy"></label>
-    {% else %}<label>Contribution (₹)<input type="number" name="contribution" value="0"></label>{% endif %}
-    <button class="btn">Add {{ module[:-1]|title if module.endswith('s') else module|title }}</button>
-  </form>
-  <div class="table-card"><table><thead><tr><th>Name</th><th>Event</th><th>Contact</th><th>Details</th></tr></thead><tbody>
-  {% for row in rows %}<tr><td>{{ row.name }}</td><td>{{ row.event_id }}</td><td>{{ row.email if module != 'sponsors' else row.contact }}</td><td>{{ row.task if module=='volunteers' else row.criteria if module=='judges' else '₹%.2f'|format(row.contribution) }}</td></tr>{% else %}<tr><td colspan="4" class="empty">No records yet.</td></tr>{% endfor %}
-  </tbody></table></div>
+<div class="cems-page-header">
+  <div class="cems-page-header-top"><div><h1 class="cems-page-title">{{ module|title }} Management</h1></div></div>
+</div>
+
+<form method="post" class="cems-card" style="padding:24px;margin-bottom:24px;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="cems-form-group">
+    <label class="cems-form-label" for="s-name">Name</label>
+    <input id="s-name" name="name" class="cems-form-input" required>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div class="cems-form-group">
+      <label class="cems-form-label" for="s-contact">Email / Contact</label>
+      <input id="s-contact" name="{{ 'contact' if module == 'sponsors' else 'email' }}" class="cems-form-input">
+    </div>
+    <div class="cems-form-group">
+      <label class="cems-form-label" for="s-event">Event</label>
+      <select id="s-event" name="event_id" class="cems-form-select" required>
+        {% for e in events %}<option value="{{ e.id }}">{{ e.title }}</option>{% else %}<option value="">Create an event first</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+  {% if module == 'volunteers' %}
+  <div class="cems-form-group"><label class="cems-form-label" for="s-task">Task</label><input id="s-task" name="task" class="cems-form-input" placeholder="Registration desk / stage / help desk"></div>
+  {% elif module == 'judges' %}
+  <div class="cems-form-group"><label class="cems-form-label" for="s-criteria">Evaluation Criteria</label><input id="s-criteria" name="criteria" class="cems-form-input" placeholder="Innovation, presentation, accuracy"></div>
+  {% else %}
+  <div class="cems-form-group"><label class="cems-form-label" for="s-amount">Contribution (₹)</label><input id="s-amount" type="number" min="0" step="0.01" name="contribution" value="0" class="cems-form-input"></div>
+  {% endif %}
+  <button class="cems-btn cems-btn-primary" type="submit" {% if not events %}disabled{% endif %}>Add {{ singular }}</button>
+</form>
+
+<div class="cems-card">
+  <div class="cems-overflow-x-auto">
+    <table class="cems-table">
+      <thead><tr><th>Name</th><th>Event</th><th>Contact</th><th>Details</th><th></th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td><strong>{{ row.name }}</strong></td>
+          <td>{{ event_map[row.event_id].title if row.event_id in event_map else '—' }}</td>
+          <td>{{ (row.contact if module == 'sponsors' else row.email) or '—' }}</td>
+          <td>{% if module == 'volunteers' %}{{ row.task or '—' }}{% elif module == 'judges' %}{{ row.criteria or '—' }}{% else %}₹{{ '%.2f'|format(row.contribution or 0) }}{% endif %}</td>
+          <td>
+            <form method="post" action="{{ url_for('organizer_support_delete', module=module, row_id=row.id) }}" onsubmit="return confirm('Remove this {{ singular|lower }}?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="cems-btn cems-btn-danger cems-btn-sm" type="submit">Remove</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="text-align:center;padding:36px;color:var(--cems-text-muted)">No records yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}
-

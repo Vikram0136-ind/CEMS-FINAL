@@ -4,6 +4,15 @@
 {% block breadcrumb %}<a href="{{ url_for('events') }}">Events</a> › {{ event.title }}{% endblock %}
 {% block extra_css %}
 <style>
+.cems-ed-banner-card { background:#fff; border:1px solid var(--cems-border); border-radius:16px; overflow:hidden; margin-bottom:20px; }
+.cems-ed-banner-img { display:block; width:100%; max-height:300px; object-fit:cover; }
+.cems-ed-titlebar { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; margin-bottom:24px; flex-wrap:wrap; }
+.cems-ed-titlebar h1 { font-size:1.6rem; font-weight:800; color:var(--cems-text-primary); margin:0 0 10px; }
+.cems-ed-titlemeta { list-style:none; padding:0; margin:0; display:flex; flex-wrap:wrap; gap:8px 22px; color:var(--cems-text-secondary); font-size:.88rem; }
+.cems-ed-titlemeta li { display:flex; align-items:center; gap:7px; }
+.cems-ed-titlemeta svg { color:var(--cems-text-muted); }
+.cems-ed-titlebar-actions { display:flex; gap:10px; align-items:center; }
+
 /* ===== Event Detail Page — Coding Hackathon Edition ===== */
 
 .cems-ed-hero {
@@ -512,63 +521,36 @@
     Back to Events
   </a>
 
-  {# ===== HERO BANNER ===== #}
-  <div class="cems-ed-hero">
-    {% if event_banner_url(event) %}
-    <img src="{{ event_banner_url(event) }}" alt="{{ event.title }}" class="cems-ed-hero-banner"
-         onerror="this.style.display='none'">
-    {% endif %}
-    <div class="cems-ed-hero-content">
-      <div class="cems-ed-hero-tech-tags">
-        <span class="cems-ed-hero-tag accent">🏆 {{ event.category }}</span>
-        <span class="cems-ed-hero-tag">⚡ {{ event.event_type|title }} Event</span>
-        <span class="cems-ed-hero-tag">🏛️ AGC Tech Fest 2026</span>
-        {% if event.target_department %}
-        <span class="cems-ed-hero-tag">{{ event.target_department }}</span>
-        {% endif %}
-      </div>
-      <h1 class="cems-ed-hero-title">{{ event.title }}</h1>
-      <p class="cems-ed-hero-subtitle">{{ event.date.strftime('%A, %d %B %Y') }} · {{ event.start_time }} – {{ event.end_time }} · {{ event.venue }}</p>
-    </div>
+  {# ===== BANNER + TITLE BAR (matches the reference screens) ===== #}
+  <div class="cems-ed-banner-card">
+    <img src="{{ event_banner_url(event) }}" alt="{{ event.title }}" class="cems-ed-banner-img"
+         onerror="this.onerror=null;this.src='{{ category_banner_url(event.category) }}';">
   </div>
 
-  {# ===== META INFO BAR ===== #}
-  <div class="cems-ed-meta">
-    <div class="cems-ed-meta-item">
-      <div class="cems-ed-meta-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      </div>
-      <div>
-        <div class="cems-ed-meta-label">Date</div>
-        <div class="cems-ed-meta-value">{{ event.date.strftime('%d %b %Y') }}</div>
-      </div>
+  <div class="cems-ed-titlebar">
+    <div class="cems-ed-titlebar-text">
+      <h1>{{ event.title }}</h1>
+      <ul class="cems-ed-titlemeta">
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>{{ event.date.strftime('%A, %d %B %Y') }}</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>{{ event.start_time }} – {{ event.end_time }}</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>{{ event.venue }}</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>{{ event.organizer.name if event.organizer else '—' }}</li>
+      </ul>
     </div>
-    <div class="cems-ed-meta-item">
-      <div class="cems-ed-meta-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      </div>
-      <div>
-        <div class="cems-ed-meta-label">Time</div>
-        <div class="cems-ed-meta-value">{{ event.start_time }} – {{ event.end_time }}</div>
-      </div>
-    </div>
-    <div class="cems-ed-meta-item">
-      <div class="cems-ed-meta-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-      </div>
-      <div>
-        <div class="cems-ed-meta-label">Venue</div>
-        <div class="cems-ed-meta-value">{{ event.venue }}</div>
-      </div>
-    </div>
-    <div class="cems-ed-meta-item">
-      <div class="cems-ed-meta-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      </div>
-      <div>
-        <div class="cems-ed-meta-label">Organizer</div>
-        <div class="cems-ed-meta-value">{{ event.organizer.name if event.organizer else '—' }}</div>
-      </div>
+    <div class="cems-ed-titlebar-actions">
+      <button type="button" class="cems-btn cems-btn-outline" id="share-event" data-title="{{ event.title }}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+        Share
+      </button>
+      {% if registered %}
+      <a href="{{ url_for('my_registrations') }}" class="cems-btn cems-btn-success">You're Registered</a>
+      {% elif reg_ctx.can_register %}
+      <a href="{{ url_for('register_event', event_id=event.id) }}" class="cems-btn cems-btn-primary">Register Now</a>
+      {% elif not current_user.is_authenticated %}
+      <a href="{{ url_for('login', next=url_for('event_details', event_id=event.id)) }}" class="cems-btn cems-btn-primary">Login to Register</a>
+      {% else %}
+      <span class="cems-btn cems-btn-outline" style="cursor:default;opacity:.8" title="{{ reg_ctx.reason }}">{{ reg_ctx.message }}</span>
+      {% endif %}
     </div>
   </div>
 
@@ -577,51 +559,6 @@
 
     {# ===== LEFT COLUMN ===== #}
     <div>
-
-      {# CTA — Register Now #}
-      {% if not registered %}
-        {% if reg_ctx.can_register %}
-        <div class="cems-ed-cta">
-          <div class="cems-ed-cta-content">
-            <h2>🎯 Ready to Participate?</h2>
-            <p>Secure your spot in {{ event.title }} — limited seats available!</p>
-            <a href="{{ url_for('register_event', event_id=event.id) }}" class="cta-btn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
-              Register Now
-            </a>
-            {% if event.fee %}
-            <p style="margin-top:12px; font-size:0.8rem; color:rgba(255,255,255,0.7);">Fee: ₹{{ '%.2f'|format(event.fee) }} · Payment on-site</p>
-            {% else %}
-            <p style="margin-top:12px; font-size:0.8rem; color:rgba(255,255,255,0.7);">Free Registration · No Fee</p>
-            {% endif %}
-          </div>
-        </div>
-        {% else %}
-        <div class="cems-ed-cta">
-          <div class="cems-ed-cta-content">
-            <h2>{{ reg_ctx.message or 'Registration Unavailable' }}</h2>
-            <p>{{ reg_ctx.reason }}</p>
-            {% if not current_user.is_authenticated %}
-            <a href="{{ url_for('login') }}?next={{ url_for('event_details', event_id=event.id) }}" class="cta-btn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4m-1-12 4 4-4 4m4-4H9"/></svg>
-              Login to Register
-            </a>
-            {% endif %}
-          </div>
-        </div>
-        {% endif %}
-      {% else %}
-        <div class="cems-ed-cta registered">
-          <div class="cems-ed-cta-content">
-            <h2>✅ You're Registered!</h2>
-            <p>Your spot is confirmed for {{ event.title }}.</p>
-            <a href="{{ url_for('my_registrations') }}" class="cta-btn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5h11M9 12h11M9 19h11"/><path d="m3 5 1.5 1.5L7 4m-4 8 1.5 1.5L7 12m-4 8 1.5 1.5L7 20"/></svg>
-              View My Registrations
-            </a>
-          </div>
-        </div>
-      {% endif %}
 
       {# About Event #}
       <div class="cems-ed-section">
@@ -698,19 +635,15 @@
         </div>
 
         <div class="cems-ed-info-row">
-          <span class="cems-ed-info-label">Seats</span>
+          <span class="cems-ed-info-label">Seats Available</span>
           <span class="cems-ed-info-value">
-            {% if seats >= event.capacity %}
-              <span style="color: var(--cems-danger);">{{ seats }} / {{ event.capacity }}</span>
-            {% else %}
-              {{ seats }} / {{ event.capacity }}
-            {% endif %}
+            <span style="color: var(--cems-{{ 'danger' if seats <= 0 else 'success' }});">{{ seats }} / {{ event.capacity }}</span>
           </span>
         </div>
 
         {# Seat progress bar #}
         <div class="cems-ed-seat-bar">
-          <div class="cems-ed-seat-fill" style="width: {{ ((event.capacity - seats) / event.capacity * 100) | round(1) }}%"></div>
+          <div class="cems-ed-seat-fill" style="width: {{ (((event.capacity - seats) / event.capacity * 100) if event.capacity else 100) | round(1) }}%"></div>
         </div>
 
         <div class="cems-ed-info-row">
@@ -735,6 +668,11 @@
         <div class="cems-ed-info-row">
           <span class="cems-ed-info-label">Organized By</span>
           <span class="cems-ed-info-value">{{ event.organizer.name if event.organizer else '—' }}</span>
+        </div>
+
+        <div class="cems-ed-info-row">
+          <span class="cems-ed-info-label">Total Registrations</span>
+          <span class="cems-ed-info-value">{{ event.registrations|rejectattr('status', 'in', ['cancelled', 'rejected'])|list|length }}</span>
         </div>
       </div>
 
@@ -783,4 +721,17 @@
   {{ timeline.render_event_timeline(event) }}
 
 </div>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.getElementById('share-event')?.addEventListener('click', async function () {
+  const data = { title: this.dataset.title, url: window.location.href };
+  try {
+    if (navigator.share) { await navigator.share(data); return; }
+    await navigator.clipboard.writeText(data.url);
+    this.textContent = 'Link copied!';
+    setTimeout(() => { this.textContent = 'Share'; }, 1800);
+  } catch (e) { /* user cancelled */ }
+});
+</script>
 {% endblock %}

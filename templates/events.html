@@ -43,7 +43,7 @@
       {% for event in events %}
       {% set reg_status = registration_status_map.get(event.id) if registration_status_map else none %}
       {% set reg = reg_status == 'confirmed' %}
-      {% set active_regs = event.registrations|selectattr('status', 'notequalto', 'cancelled')|list if event.registrations else [] %}
+      {% set active_regs = event.registrations|selectattr('status', 'ne', 'cancelled')|list if event.registrations else [] %}
       {% set seats_left = (event.capacity or 0) - (active_regs|length) %}
       {% set reg_closed = event.registration_deadline is not none and now().date() > event.registration_deadline %}
       {{ render_event_card(event, registered=reg, seats_left=seats_left, registration_closed=reg_closed, show_organizer=True, show_registration=True, show_action=True) }}

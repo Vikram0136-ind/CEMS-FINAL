@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% block title %}CEMS - {{ college_short }} Campus Events{% endblock %}
+{% block site_header %}{% endblock %}
+{% block site_footer %}{% endblock %}
 {% block extra_head %}
   <link rel="icon" href="{{ url_for('static', filename='images/agc-logo.svg') }}" type="image/svg+xml">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}">
@@ -159,8 +161,12 @@
         <a href="{{ url_for('events') }}">Events</a>
       </nav>
       <div class="cems-landing-nav-actions">
+        {% if current_user.is_authenticated %}
+        <a class="cems-btn cems-btn-primary" href="{{ url_for('dashboard') }}">Go to Dashboard</a>
+        {% else %}
         <a class="cems-btn cems-btn-ghost" href="{{ url_for('login') }}">Login</a>
         <a class="cems-btn cems-btn-primary" href="{{ url_for('register') }}">Create Account</a>
+        {% endif %}
       </div>
       <button class="cems-landing-mobile-toggle" id="cems-landing-mobile-toggle" type="button" aria-label="Toggle navigation" aria-controls="cems-landing-mobile-menu" aria-expanded="false">
         <span></span>

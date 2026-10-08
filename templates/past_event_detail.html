@@ -78,7 +78,7 @@
   <div class="cems-detail-banner-wrap">
     {% if img_url %}
     <img src="{{ img_url }}" alt="{{ event.title }}" class="cems-detail-banner"
-         onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\"cems-detail-banner-placeholder\">{{ event.category[:2].upper() }}</div>';">
+         onerror="this.onerror=null;this.parentElement.innerHTML='<div class=&quot;cems-detail-banner-placeholder&quot;>{{ event.category[:2].upper() }}</div>';">
     {% else %}
     <div class="cems-detail-banner-placeholder">{{ event.category[:2].upper() }}</div>
     {% endif %}
@@ -203,7 +203,7 @@
               <img src="{{ image_url(item.image) }}"
                    alt="{{ item.caption or event.title }}"
                    loading="lazy"
-                   onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\"cems-detail-banner-placeholder\" style=\"font-size:2rem\">{{ event.category[:2].upper() }}</div>';">
+                   onerror="this.onerror=null;this.parentElement.innerHTML='<div class=&quot;cems-detail-banner-placeholder&quot; style=&quot;font-size:2rem&quot;>{{ event.category[:2].upper() }}</div>';">
               {% if item.caption %}<span class="cems-gallery-caption">{{ item.caption }}</span>{% endif %}
             </div>
             {% endfor %}

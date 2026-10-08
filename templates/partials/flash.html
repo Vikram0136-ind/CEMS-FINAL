@@ -1,0 +1,13 @@
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="cems-flash-stack" role="status" aria-live="polite">
+    {% for category, message in messages %}
+    {% set kind = 'danger' if category in ['danger', 'error'] else category %}
+    <div class="cems-alert cems-alert-{{ kind }}">
+      <span class="cems-alert-text">{{ message }}</span>
+      <button type="button" class="cems-alert-close" aria-label="Dismiss" onclick="this.parentElement.remove()">×</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}

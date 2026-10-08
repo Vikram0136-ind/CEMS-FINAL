@@ -1,0 +1,44 @@
+{% macro field(name, label, type='text', placeholder='', required=False, hint='', full=False, value='', autocomplete='', extra='') -%}
+<div class="cems-field{% if full %} full{% endif %}">
+  <label for="f-{{ name }}">{{ label }}{% if required %}<span class="req">*</span>{% endif %}</label>
+  <input type="{{ type }}" id="f-{{ name }}" name="{{ name }}" placeholder="{{ placeholder }}" value="{{ value }}"{% if required %} required{% endif %}{% if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %} {{ extra|safe }}>
+  {% if hint %}<span class="hint">{{ hint }}</span>{% endif %}
+  <span class="field-error" data-error-for="{{ name }}"></span>
+</div>
+{%- endmacro %}
+
+{% macro select(name, label, options, placeholder='Select', required=False, full=False, selected='') -%}
+<div class="cems-field{% if full %} full{% endif %}">
+  <label for="f-{{ name }}">{{ label }}{% if required %}<span class="req">*</span>{% endif %}</label>
+  <select id="f-{{ name }}" name="{{ name }}"{% if required %} required{% endif %}>
+    {% if placeholder %}<option value="">{{ placeholder }}</option>{% endif %}
+    {% for opt in options %}
+    {% if opt is string %}<option value="{{ opt }}"{% if opt == selected %} selected{% endif %}>{{ opt }}</option>
+    {% else %}<option value="{{ opt[0] }}"{% if opt[0] == selected %} selected{% endif %}>{{ opt[1] }}</option>{% endif %}
+    {% endfor %}
+  </select>
+  <span class="field-error" data-error-for="{{ name }}"></span>
+</div>
+{%- endmacro %}
+
+{% macro photo_field() -%}
+<div class="cems-field full">
+  <label for="f-profile_photo">Profile Photo (Optional)</label>
+  <input type="file" id="f-profile_photo" name="profile_photo" accept="image/jpeg,image/png,image/webp">
+  <span class="hint">Upload a profile photo (JPG, PNG, WEBP, max 2MB)</span>
+  <span class="field-error" data-error-for="profile_photo"></span>
+</div>
+{%- endmacro %}
+
+{% macro password_fields() -%}
+<div class="cems-field full">
+  <label for="f-password">Password<span class="req">*</span></label>
+  <input type="password" id="f-password" name="password" placeholder="At least 8 characters" required minlength="8" autocomplete="new-password">
+  <span class="field-error" data-error-for="password"></span>
+</div>
+<div class="cems-field full">
+  <label for="f-confirm_password">Confirm Password<span class="req">*</span></label>
+  <input type="password" id="f-confirm_password" name="confirm_password" placeholder="Confirm your password" required minlength="8" autocomplete="new-password">
+  <span class="field-error" data-error-for="confirm_password"></span>
+</div>
+{%- endmacro %}

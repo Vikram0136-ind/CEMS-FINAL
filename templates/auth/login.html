@@ -1,131 +1,53 @@
 {% extends "base.html" %}
-{% block title %}Login — CEMS{% endblock %}
-{% block extra_css %}
-<style>
-  .cems-login-error {
-    background: var(--cems-danger-bg, #fef2f2);
-    color: var(--cems-danger-dark, #7f1d1d);
-    padding: 12px 16px;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    margin-bottom: 16px;
-    border-left: 4px solid var(--cems-danger, #ef4444);
-    animation: cemsFadeIn 0.3s ease-out;
-    display: none;
-  }
-  .cems-login-error.show { display: block; }
-  .form-card input.has-error {
-    border-color: var(--cems-danger, #ef4444);
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-  }
-  @keyframes cemsFadeIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-</style>
-{% endblock %}
+{% block title %}Sign In — CEMS{% endblock %}
+{% block body_class %} cems-auth{% endblock %}
+{% block site_header %}{% endblock %}
+{% block site_footer %}{% endblock %}
 {% block content %}
-<div class="auth-page"><div class="auth-art"><span class="eyebrow">WELCOME BACK</span><h2>Explore campus events.</h2><p>Login to discover, register and participate.</p><div class="big-icon">🔐</div></div>
-<form class="form-card" method="post" id="login-form">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <h1>Login</h1>
-  <div id="login-error-container"></div>
-  <label>Email Address<input type="email" name="email" required placeholder="Enter email" value="{{ request.form.get('email', '') }}"></label>
-  <label>Password<div class="input-inline"><input type="password" name="password" required placeholder="Enter password"><a href="{{ url_for('forgot_password') }}">Forgot Password?</a></div></label>
-  <label class="check"><input type="checkbox" name="remember"> Remember Me</label>
-  <button class="btn full">Login</button>
-  <p class="center">Don't have an account? <a href="{{ url_for('register') }}">Register</a></p>
-  <div class="demo-box"><b>Demo accounts</b><br>Admin: admin@agc.local / Admin@123<br>Organizer: organizer@agc.local / Organizer@123<br>Teacher: teacher@agc.local / Teacher@123<br>Student: student@agc.local / Student@123</div>
-</form></div>
-{% endblock %}
-{% block extra_js %}
-<script>
-(function() {
-  var form = document.getElementById('login-form');
-  var errorContainer = document.getElementById('login-error-container');
-
-  function showError(msg) {
-    errorContainer.innerHTML = '';
-    var div = document.createElement('div');
-    div.className = 'cems-login-error show';
-    div.textContent = msg;
-    errorContainer.appendChild(div);
-  }
-
-  function clearErrors() {
-    errorContainer.innerHTML = '';
-  }
-
-  function markError(field) {
-    var input = form.querySelector('[name="' + field + '"]');
-    if (input) input.classList.add('has-error');
-  }
-
-  form.addEventListener('submit', function(e) {
-    e.preventDefault();
-    clearErrors();
-
-    var formData = new FormData(form);
-
-    fetch(form.action || window.location.href, {
-      method: 'POST',
-      body: formData,
-      headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    })
-    .then(function(response) {
-      if (response.status === 400) {
-        return response.json().then(function(data) {
-          return { success: false, errors: data.errors || {}, message: data.message };
-        });
-      }
-      if (response.status === 418) {
-        return response.json().then(function(data) {
-          return { success: false, errors: data.errors || {}, message: data.message };
-        });
-      }
-      return response.json().then(function(data) {
-        return { success: true, data: data, status: response.status };
-      });
-    })
-    .then(function(result) {
-      if (result.success) {
-        if (result.data && result.data.redirect) {
-          window.location.href = result.data.redirect;
-        } else {
-          window.location.href = '{{ url_for("dashboard") }}';
-        }
-      } else {
-        var msgs = [];
-        if (result.message) msgs.push(result.message);
-        if (result.errors) {
-          Object.keys(result.errors).forEach(function(key) {
-            msgs.push(result.errors[key]);
-            if (key !== 'credentials' && key !== 'account' && key !== 'role') {
-              markError(key);
-            }
-          });
-        }
-        if (msgs.length > 0) {
-          showError(msgs.join(' '));
-        }
-      }
-    })
-    .catch(function(err) {
-      showError('A network error occurred. Please try again.');
-      console.error(err);
-    });
-  });
-
-  form.querySelectorAll('input, select').forEach(function(input) {
-    input.addEventListener('input', function() {
-      this.classList.remove('has-error');
-      clearErrors();
-    });
-    input.addEventListener('change', function() {
-      this.classList.remove('has-error');
-      clearErrors();
-    });
-  });
-})();
-</script>
+<div class="cems-auth-stage center">
+  <div class="cems-login-card" style="--accent:#6366f1">
+    <aside class="cems-login-aside">
+      <div class="cems-login-logo">C</div>
+      <h1>Welcome to CEMS</h1>
+      <p>Your complete campus event management platform. Discover events, register instantly, and manage your event journey.</p>
+      <ul>
+        {% for item in ['Discover campus events', 'Instant registration', 'Digital QR tickets', 'Real-time notifications'] %}
+        <li><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>{{ item }}</li>
+        {% endfor %}
+      </ul>
+    </aside>
+    <section class="cems-login-main">
+      <h2>Sign In</h2>
+      <p class="lead">Enter your credentials to continue</p>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+        <div class="cems-alert cems-alert-{{ 'danger' if category in ['danger','error'] else category }}" style="margin-bottom:16px">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+      <form method="post" action="{{ url_for('login') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+        <div class="cems-field">
+          <label for="login-email">Email Address</label>
+          <input type="email" id="login-email" name="email" placeholder="you@college.edu" required autocomplete="username" value="{{ request.form.get('email', '') }}">
+        </div>
+        <div class="cems-field">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" name="password" placeholder="Enter your password" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="cems-auth-submit">Sign In</button>
+      </form>
+      <div class="cems-auth-links">
+        <span>Don't have an account? <a href="{{ url_for('register') }}">Create Account</a></span>
+        <a href="{{ url_for('forgot_password') }}">Forgot password?</a>
+      </div>
+      {% if demo_accounts %}
+      <div class="cems-login-demo">
+        <strong>Demo accounts</strong><br>
+        {% for label, email, password in demo_accounts %}{{ label }}: {{ email }} / {{ password }}<br>{% endfor %}
+      </div>
+      {% endif %}
+    </section>
+  </div>
+</div>
 {% endblock %}

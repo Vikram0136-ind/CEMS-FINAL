@@ -11,10 +11,10 @@
 
 :root {
   /* Colors - Professional Palette */
-  --cems-primary: #ff6ba8;
-  --cems-primary-dark: #ff4d8d;
-  --cems-primary-light: #ffb3d4;
-  --cems-primary-bg: #ffd6e8;
+  --cems-primary: #6366f1;
+  --cems-primary-dark: #4f46e5;
+  --cems-primary-light: #a5b4fc;
+  --cems-primary-bg: #eef2ff;
   
   --cems-success: #10b981;
   --cems-success-dark: #059669;
@@ -45,9 +45,9 @@
   --cems-slate-900: #0f172a;
   
   /* Backgrounds */
-  --cems-bg-primary: #fff5fa;
-  --cems-bg-secondary: #ffe4f1;
-  --cems-bg-tertiary: #ffd6e8;
+  --cems-bg-primary: #ffffff;
+  --cems-bg-secondary: #f1f5f9;
+  --cems-bg-tertiary: #eef2ff;
   
   /* Text */
   --cems-text-primary: #0f172a;
@@ -109,7 +109,7 @@ html {
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #ffe4f1;
+  background: #f8fafc;
   color: var(--cems-text-primary);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -154,7 +154,7 @@ img {
 
 .cems-sidebar {
   width: var(--cems-sidebar-width);
-  background: linear-gradient(180deg, #ff9ecb 0%, #ff6ba8 100%);
+  background: #0f172a;
   color: var(--cems-text-primary);
   position: fixed;
   top: 0;
@@ -178,7 +178,7 @@ img {
 .cems-sidebar-logo {
   width: 36px;
   height: 36px;
-  background: #ff4d8d;
+  background: #6366f1;
   border-radius: var(--cems-radius-md);
   display: flex;
   align-items: center;
@@ -192,7 +192,7 @@ img {
 .cems-sidebar-brand {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #5a2a3a;
+  color: #ffffff;
   line-height: 1.2;
 }
 
@@ -200,7 +200,7 @@ img {
   display: block;
   font-size: 0.7rem;
   font-weight: 400;
-  color: #8a3a4a;
+  color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -219,7 +219,7 @@ img {
   padding: 8px 12px;
   font-size: 0.7rem;
   font-weight: 600;
-  color: #8a3a4a;
+  color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.8px;
   margin-bottom: 4px;
@@ -231,7 +231,7 @@ img {
   gap: 12px;
   padding: 10px 12px;
   border-radius: var(--cems-radius-md);
-  color: #5a2a3a;
+  color: #cbd5e1;
   font-size: 0.9rem;
   font-weight: 500;
   margin-bottom: 2px;
@@ -242,14 +242,14 @@ img {
 }
 
 .cems-nav-item:hover {
-  background: rgba(255, 255, 255, 0.5);
-  color: #3d1a2a;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
 }
 
 .cems-nav-item.active {
-  background: #ff4d8d;
+  background: #6366f1;
   color: #fff;
-  box-shadow: 0 4px 12px rgba(255, 77, 141, 0.4);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
 }
 
 .cems-nav-item svg {
@@ -265,7 +265,7 @@ img {
 
 .cems-sidebar-footer {
   padding: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.4);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .cems-sidebar-user {
@@ -278,14 +278,14 @@ img {
 }
 
 .cems-sidebar-user:hover {
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .cems-sidebar-avatar {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #ff4d8d;
+  background: #6366f1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -303,7 +303,7 @@ img {
 .cems-sidebar-user-name {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #3d1a2a;
+  color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -311,7 +311,7 @@ img {
 
 .cems-sidebar-user-role {
   font-size: 0.75rem;
-  color: #8a3a4a;
+  color: #94a3b8;
   text-transform: capitalize;
 }
 
@@ -328,7 +328,7 @@ img {
 .cems-header {
   height: var(--cems-header-height);
   background: var(--cems-bg-primary);
-  border-bottom: 1px solid #ffd6e8;
+  border-bottom: 1px solid var(--cems-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -440,8 +440,9 @@ img {
   height: 20px;
 }
 
-.cems-badge {
+.cems-icon-btn .cems-badge {
   position: absolute;
+  padding: 0;
   top: 6px;
   right: 6px;
   width: 18px;
@@ -476,7 +477,7 @@ img {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #ff4d8d;
+  background: #6366f1;
   display: flex;
   align-items: center;
   justify-content: center;

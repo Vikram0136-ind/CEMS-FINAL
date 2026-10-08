@@ -116,11 +116,11 @@
         <div class="cems-grid-2">
           <div class="cems-form-group">
             <label class="cems-form-label">Start Time</label>
-            <input type="time" name="start_time" class="cems-form-input" value="{{ event.start_time }}">
+            <input type="time" name="start_time" class="cems-form-input" value="{{ event.start_time|time24 }}">
           </div>
           <div class="cems-form-group">
             <label class="cems-form-label">End Time</label>
-            <input type="time" name="end_time" class="cems-form-input" value="{{ event.end_time }}">
+            <input type="time" name="end_time" class="cems-form-input" value="{{ event.end_time|time24 }}">
           </div>
         </div>
         
@@ -285,6 +285,31 @@
           Save Changes
         </button>
       </div>
+    </form>
+  </div>
+</div>
+
+<div class="cems-card" style="max-width: 900px; margin-top: 24px;">
+  <div class="cems-card-header"><div class="cems-card-title">Faculty Coordinators</div></div>
+  <div class="cems-card-body">
+    {% for row in event.faculty_assignments %}
+    <form method="post" action="{{ url_for('organizer_assign_faculty', event_id=event.id) }}" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--cems-border-light)">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="faculty_id" value="{{ row.faculty_id }}">
+      <input type="hidden" name="remove" value="1">
+      <span><strong>{{ row.faculty.name }}</strong> <span class="cems-text-muted" style="font-size:.8rem">{{ row.faculty.department or '' }}</span></span>
+      <button type="submit" class="cems-btn cems-btn-danger cems-btn-sm">Remove</button>
+    </form>
+    {% else %}
+    <p class="cems-text-muted" style="margin-bottom:12px">No faculty coordinator assigned yet.</p>
+    {% endfor %}
+    <form method="post" action="{{ url_for('organizer_assign_faculty', event_id=event.id) }}" style="display:flex;gap:10px;margin-top:14px">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <select name="faculty_id" class="cems-form-select" required>
+        <option value="">Select faculty member</option>
+        {% for member in faculty_members if member.id not in assigned_ids %}<option value="{{ member.id }}">{{ member.name }}{% if member.department %} — {{ member.department }}{% endif %}</option>{% endfor %}
+      </select>
+      <button type="submit" class="cems-btn cems-btn-primary">Assign</button>
     </form>
   </div>
 </div>

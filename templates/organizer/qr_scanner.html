@@ -53,6 +53,12 @@
 </div>
 
 <div class="cems-qr-scanner-container">
+  <div class="cems-form-group" style="margin-bottom:16px">
+    <label class="cems-form-label" for="qr-event">Event</label>
+    <select id="qr-event" class="cems-form-select">
+      {% for e in events %}<option value="{{ e.id }}" {% if e.id == default_event_id %}selected{% endif %}>{{ e.title }} — {{ e.date.strftime('%d %b %Y') }}</option>{% else %}<option value="">No approved events</option>{% endfor %}
+    </select>
+  </div>
   <div class="cems-qr-scanner-video-wrap" id="qr-video-wrap">
     <div class="cems-qr-overlay" id="qr-overlay">
       <svg fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -151,21 +157,22 @@
 
   function submitCheckin(decodedText) {
     html5QrCode.pause();
-    fetch('{{ url_for("api_checkin") }}', {
+    const eventId = parseInt(document.getElementById('qr-event').value, 10);
+    fetch('{{ url_for("kiosk_checkin_api") }}', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-CSRFToken': csrfToken
       },
-      body: JSON.stringify({ ticket_code: decodedText })
+      body: JSON.stringify({ event_id: eventId, identifier: decodedText, method: 'qr_scan' })
     })
     .then(r => r.json())
     .then(data => {
       if (data.success) {
-        showResult('success', null, data.participant, data.event, data.ticket_code, data.checkin_time);
-        if (data.already_attended) {
-          successAlert.innerHTML = '<b>⚠️ Already checked in</b>';
-        }
+        const eventSelect = document.getElementById('qr-event');
+        showResult('success', null, data.participant, eventSelect.options[eventSelect.selectedIndex].text, data.ticket_code,
+                   data.checkin_time ? new Date(data.checkin_time).toLocaleString() : '—');
+        successAlert.innerHTML = data.status === 'duplicate' ? '<b>⚠️ Already checked in</b>' : '<b>✅ Check-in successful!</b>';
       } else {
         showResult('error', data.message || 'Unknown error', null, null, null, null);
       }
@@ -177,6 +184,7 @@
   }
 
   let scanning = true;
+  function resumeScanning() { scanning = true; }
 
   html5QrCode.start(
     { facingMode: "environment" },
@@ -195,7 +203,7 @@
       '<div style="padding:40px;text-align:center;"><p style="color:var(--cems-danger);font-weight:600;">❌ Camera access denied or unavailable.</p><p style="color:var(--cems-text-muted);margin-top:10px;">Please use the manual entry form instead.</p><a href="{{ url_for("checkin") }}" class="cems-btn cems-btn-primary" style="margin-top:15px;">Go to Manual Check-in</a></div>';
   });
 
-  resetBtn.addEventListener('click', resetScanner);
+  resetBtn.addEventListener('click', function () { resumeScanning(); resetScanner(); });
 })();
 </script>
 {% endblock %}

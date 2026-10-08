@@ -1,79 +1,40 @@
 {% extends "base.html" %}
 {% block title %}All Registrations — CEMS{% endblock %}
+{% block breadcrumb %}Registrations{% endblock %}
+
 {% block content %}
-<div class="dashboard">
-  <aside class="sidebar">
-    <div class="side-brand"><strong>⚙️ CEMS</strong><span>Admin Panel</span></div>
-    <nav>
-      <a href="{{ url_for('admin_dashboard') }}">📊 Dashboard</a>
-      <a href="{{ url_for('admin_users') }}">👥 Manage Users</a>
-      <a href="{{ url_for('admin_events') }}">📅 Manage Events</a>
-      <a class="active" href="{{ url_for('admin_registrations') }}">📋 Registrations</a>
-      <a href="{{ url_for('admin_reports') }}">📈 Reports</a>
-    </nav>
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">Settings</div>
-      <a href="{{ url_for('admin_notifications') }}">🔔 Notifications</a>
-      <a href="{{ url_for('admin_venues') }}">🏢 Venues</a>
+<div class="cems-page-header">
+  <div class="cems-page-header-top">
+    <div>
+      <h1 class="cems-page-title">All Registrations</h1>
+      <p class="cems-page-description">View all student registrations across events.</p>
     </div>
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">Account</div>
-      <a href="{{ url_for('logout') }}" data-logout>🚪 Logout</a>
+    <div class="cems-page-actions">
+      <a href="{{ url_for('export_registrations') }}" class="cems-btn cems-btn-primary">Export CSV</a>
     </div>
-  </aside>
+  </div>
+</div>
 
-  <section class="dash-main">
-    <div class="dash-head">
-      <div>
-        <h1>All Registrations 📋</h1>
-        <p style="color: #7b8495; margin: 5px 0 0;">View all student registrations across events</p>
-      </div>
-      <div style="display: flex; gap: 10px;">
-        <a href="{{ url_for('export_registrations') }}" class="btn" style="background: var(--cems-info); color: white;">📥 Export CSV</a>
-      </div>
-    </div>
-
-    <div class="section">
-      <div style="overflow-x: auto;">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Student Name</th>
-              <th>Email</th>
-              <th>Event</th>
-              <th>Ticket Code</th>
-              <th>Payment Status</th>
-              <th>Attendance</th>
-              <th>Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for r in registrations %}
-            <tr>
-              <td><strong>{{ r.user.name }}</strong></td>
-              <td>{{ r.user.email }}</td>
-              <td>{{ r.event.title }}</td>
-              <td><code style="background: #f0f2f7; padding: 4px 8px; border-radius: 4px;">{{ r.ticket_code }}</code></td>
-              <td><span class="status-badge {% if r.payment_status=='paid' %}approved{% else %}pending{% endif %}">{{ r.payment_status|title }}</span></td>
-              <td><span class="status-badge {% if r.attended %}approved{% else %}pending{% endif %}">{{ 'Checked In' if r.attended else 'Pending' }}</span></td>
-              <td>{{ r.registered_at.strftime('%d %b %Y') }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% if pagination and pagination.pages > 1 %}
-      <div style="display:flex;justify-content:center;gap:8px;margin-top:30px;">
-        {% if pagination.has_prev %}
-        <a class="btn outline" href="{{ url_for('admin_registrations', page=pagination.prev_num) }}">← Previous</a>
-        {% endif %}
-        <span style="align-self:center;font-size:13px;color:#7b8495;">Page {{ pagination.page }} of {{ pagination.pages }}</span>
-        {% if pagination.has_next %}
-        <a class="btn outline" href="{{ url_for('admin_registrations', page=pagination.next_num) }}">Next →</a>
-        {% endif %}
-      </div>
-      {% endif %}
-    </div>
-  </section>
+<div class="cems-card">
+  <div class="cems-overflow-x-auto">
+    <table class="cems-table">
+      <thead><tr><th>Student</th><th>Email</th><th>Event</th><th>Ticket Code</th><th>Payment</th><th>Attendance</th><th>Date</th></tr></thead>
+      <tbody>
+        {% for r in registrations %}
+        <tr>
+          <td><strong>{{ r.user.name }}</strong></td>
+          <td>{{ r.user.email }}</td>
+          <td>{{ r.event.title }}</td>
+          <td><code>{{ r.ticket_code }}</code></td>
+          <td><span class="cems-badge {{ 'cems-badge-success' if r.payment_status in ('paid', 'successful') else 'cems-badge-neutral' }}">{{ payment_display_status(r.payment_status) }}</span></td>
+          <td><span class="cems-badge {{ 'cems-badge-success' if r.attended else 'cems-badge-warning' }}">{{ 'Checked In' if r.attended else 'Pending' }}</span></td>
+          <td>{{ r.registered_at.strftime('%d %b %Y') if r.registered_at else '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;padding:36px;color:var(--cems-text-muted)">No registrations yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

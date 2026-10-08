@@ -17,34 +17,18 @@
 
 <div class="cems-card" style="max-width: 900px;">
   <div class="cems-card-body">
-    <!-- Stepper -->
-    <div class="cems-wizard-stepper" id="wizardStepper">
-      <div class="cems-stepper-step active" data-step="1">
-        <div class="cems-stepper-step-num">1</div>
-        <div class="cems-stepper-step-label">Basic Information</div>
-      </div>
-      <div class="cems-stepper-step" data-step="2">
-        <div class="cems-stepper-step-num">2</div>
-        <div class="cems-stepper-step-label">Descriptions & Rules</div>
-      </div>
-      <div class="cems-stepper-step" data-step="3">
-        <div class="cems-stepper-step-num">3</div>
-        <div class="cems-stepper-step-label">Guests & Submission</div>
-      </div>
-    </div>
-
     <form method="post" enctype="multipart/form-data" class="cems-form-grid" id="createEventForm">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
       <!-- STEP 1: Basic Information -->
-      <div class="cems-wizard-step active" data-step="1">
+      <div class="cems-wizard-step" data-step="1">
 
         <!-- Section 1: Basic Information -->
         <div class="cems-form-section">
           <h3 class="cems-section-title">📋 Basic Information</h3>
 
           <div class="cems-form-group">
-            <label class="cems-form-label">Event Name <span class="required">*</span></label>
+            <label class="cems-form-label">Event Title <span class="required">*</span></label>
             <input type="text" name="title" class="cems-form-input" required placeholder="e.g. Tech Fest 2K26" value="{{ request.form.title if request.form else '' }}">
             {% if errors and errors.title %}
               <span class="cems-form-error">{{ errors.title }}</span>
@@ -79,7 +63,7 @@
           </div>
 
           <div class="cems-form-group">
-            <label class="cems-form-label">Event Poster / Banner</label>
+            <label class="cems-form-label">Event Banner</label>
             <input type="file" name="banner" class="cems-form-input" accept="image/*" id="bannerUpload">
             <small class="cems-form-hint">Supported formats: JPG, PNG, WebP (Max 4MB)</small>
             {% if errors and errors.banner %}
@@ -220,11 +204,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Step 1 Navigation -->
-        <div class="cems-form-actions">
-          <button type="button" class="cems-btn cems-btn-primary" onclick="wizardNext(1)">Next: Descriptions & Rules →</button>
-        </div>
       </div>
 
       <!-- STEP 2: Descriptions & Rules (Page 26) -->
@@ -266,12 +245,6 @@
             <textarea name="contact_info" class="cems-form-textarea" rows="2" placeholder="Organizer contact email/phone for queries...">{{ request.form.contact_info if request.form else '' }}</textarea>
           </div>
         </div>
-
-        <!-- Step 2 Navigation -->
-        <div class="cems-form-actions">
-          <button type="button" class="cems-btn cems-btn-secondary" onclick="wizardPrev(2)">← Back</button>
-          <button type="button" class="cems-btn cems-btn-primary" onclick="wizardNext(2)">Next: Guests & Submission →</button>
-        </div>
       </div>
 
       <!-- STEP 3: Guests & Submission (Page 27) -->
@@ -304,9 +277,8 @@
 
         <!-- Step 3 Action Buttons -->
         <div class="cems-form-actions cems-form-actions-final">
-          <button type="button" class="cems-btn cems-btn-secondary" onclick="wizardPrev(3)">← Back</button>
-          <button type="submit" name="action" value="draft" class="cems-btn cems-btn-secondary">💾 Save as Draft</button>
-          <button type="submit" name="action" value="submit" class="cems-btn cems-btn-primary">🚀 Submit for Approval</button>
+                    <button type="submit" name="action" value="draft" class="cems-btn cems-btn-secondary">Save as Draft</button>
+          <button type="submit" name="action" value="submit" class="cems-btn cems-btn-primary">Submit for Approval</button>
         </div>
       </div>
     </form>
@@ -381,7 +353,7 @@
 }
 
 .cems-wizard-step {
-  display: none;
+  display: block;
 }
 
 .cems-wizard-step.active {
@@ -482,136 +454,15 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  const form = document.getElementById('createEventForm');
-  let currentStep = 1;
-  const totalSteps = 3;
-
-  // Handle stepper clicks for completed steps
-  const stepperSteps = document.querySelectorAll('.cems-stepper-step');
-  stepperSteps.forEach((step, index) => {
-    step.addEventListener('click', function() {
-      const stepNum = parseInt(this.getAttribute('data-step'));
-      if (stepNum <= currentStep) {
-        goToStep(stepNum);
-      }
-    });
-  });
-
-  // Validate fields in a step before allowing navigation
-  function validateStep(stepNum) {
-    const stepEl = document.querySelector('.cems-wizard-step[data-step="' + stepNum + '"]');
-    if (!stepEl) return true;
-    const inputs = stepEl.querySelectorAll('input[required], select[required], textarea[required]');
-    let valid = true;
-    inputs.forEach(input => {
-      if (!input.checkValidity && input.type === 'file') {
-        // File inputs are optional unless explicitly required
-      } else if (!input.checkValidity()) {
-        valid = false;
-      }
-    });
-    if (!valid) {
-      // Report first invalid field
-      const firstInvalid = stepEl.querySelector('input[required]:invalid, select[required]:invalid, textarea[required]:invalid');
-      if (firstInvalid) {
-        firstInvalid.reportValidity();
-        return false;
-      }
-    }
-    return true;
-  }
-
-  function goToStep(stepNum) {
-    if (stepNum < 1 || stepNum > totalSteps) return;
-
-    // Validate current step when moving forward
-    if (stepNum > currentStep && !validateStep(currentStep)) {
-      return;
-    }
-
-    currentStep = stepNum;
-
-    // Update step visibility
-    document.querySelectorAll('.cems-wizard-step').forEach(step => {
-      step.classList.remove('active');
-      step.style.display = 'none';
-    });
-    const targetStep = document.querySelector('.cems-wizard-step[data-step="' + stepNum + '"]');
-    if (targetStep) {
-      targetStep.classList.add('active');
-      targetStep.style.display = 'block';
-    }
-
-    // Update stepper
-    stepperSteps.forEach(s => {
-      s.classList.remove('active', 'cems-stepper-step-completed');
-      const sNum = parseInt(s.getAttribute('data-step'));
-      if (sNum < stepNum) {
-        s.classList.add('cems-stepper-step-completed');
-      } else if (sNum === stepNum) {
-        s.classList.add('active');
-      }
-    });
-
-    // Toggle "Back" button visibility on step 1
-    const backButton = targetStep.querySelector('.cems-btn-secondary[onclick*="wizardPrev"]');
-    if (backButton && stepNum === 1) {
-      backButton.style.display = 'none';
-    }
-  }
-
-  // Next button handler - validates then advances
-  window.wizardNext = function(stepNum) {
-    if (validateStep(stepNum)) {
-      goToStep(stepNum + 1);
-    }
-  };
-
-  // Previous button handler
-  window.wizardPrev = function(stepNum) {
-    goToStep(stepNum - 1);
-  };
-
-  // Payment QR toggle (existing functionality)
   const eventTypeSelect = document.getElementById('eventTypeSelect');
   const paymentQrSection = document.getElementById('paymentQrSection');
-  const paymentQrUpload = document.getElementById('paymentQrUpload');
-  const paymentQrPreview = document.getElementById('paymentQrPreview');
-  const paymentQrPreviewImg = document.getElementById('paymentQrPreviewImg');
-
-  function togglePaymentQr() {
-    if (eventTypeSelect && eventTypeSelect.value === 'paid') {
-      paymentQrSection.style.display = 'block';
-    } else {
-      paymentQrSection.style.display = 'none';
-      paymentQrPreview.style.display = 'none';
-      paymentQrUpload.value = '';
-    }
+  const feeInput = document.getElementById('feeInput');
+  function toggleFee() {
+    const paid = eventTypeSelect && eventTypeSelect.value === 'paid';
+    if (paymentQrSection) paymentQrSection.style.display = paid ? 'block' : 'none';
+    if (feeInput && !paid) feeInput.value = '0';
   }
-
-  if (eventTypeSelect) {
-    eventTypeSelect.addEventListener('change', togglePaymentQr);
-    togglePaymentQr();
-  }
-
-  if (paymentQrUpload) {
-    paymentQrUpload.addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          paymentQrPreviewImg.src = e.target.result;
-          paymentQrPreview.style.display = 'block';
-        };
-        reader.readAsDataURL(file);
-      } else {
-        paymentQrPreview.style.display = 'none';
-      }
-    });
-  }
-
-  // Handle form submission - if on an intermediate step with submit button clicked, advance first
-  // The submit buttons are only on step 3, so no special handling needed
+  if (eventTypeSelect) { eventTypeSelect.addEventListener('change', toggleFee); toggleFee(); }
 });
 </script>
 {% endblock %}

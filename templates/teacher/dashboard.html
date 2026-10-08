@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'macros/icons.html' import icon %}
 {% block title %}Faculty Dashboard — CEMS{% endblock %}
 {% block breadcrumb %}Dashboard{% endblock %}
 
@@ -6,39 +7,91 @@
 <div class="cems-page-header">
   <div class="cems-page-header-top">
     <div>
-      <h1 class="cems-page-title">Faculty Dashboard</h1>
-      <p class="cems-page-description">Welcome, {{ current_user.name }}! Overview of your assigned events and activities.</p>
+      <h1 class="cems-page-title">Welcome back, {{ current_user.name }}!</h1>
+      <p class="cems-page-description">Coordinate your events, mark attendance and keep track of student participation.</p>
+    </div>
+    <div class="cems-page-actions">
+      <a href="{{ url_for('faculty_assigned_events') }}" class="cems-btn cems-btn-primary">{{ icon('clipboard', 18) }} Assigned Events</a>
     </div>
   </div>
 </div>
 
-<div class="stats">
-  <div class="stat-card">
-    <div class="stat-number">{{ total_assigned }}</div>
-    <div class="stat-label">Total Assigned Events</div>
+<div class="cems-stats-grid">
+  <div class="cems-stat-card"><div class="cems-stat-icon primary">{{ icon('calendar', 24) }}</div><div class="cems-stat-content"><div class="cems-stat-value">{{ total_assigned }}</div><div class="cems-stat-label">Assigned Events</div></div></div>
+  <div class="cems-stat-card"><div class="cems-stat-icon warning">{{ icon('clock', 24) }}</div><div class="cems-stat-content"><div class="cems-stat-value">{{ upcoming }}</div><div class="cems-stat-label">Upcoming Events</div></div></div>
+  <div class="cems-stat-card"><div class="cems-stat-icon info">{{ icon('clipboard', 24) }}</div><div class="cems-stat-content"><div class="cems-stat-value">{{ total_registrations }}</div><div class="cems-stat-label">Total Registrations</div></div></div>
+  <div class="cems-stat-card"><div class="cems-stat-icon success">{{ icon('check', 24) }}</div><div class="cems-stat-content"><div class="cems-stat-value">{{ total_attendance }}</div><div class="cems-stat-label">Attendance Marked</div></div></div>
+</div>
+
+<div class="cems-card" style="margin-bottom:28px;">
+  <div class="cems-card-header">
+    <div class="cems-card-title">Assigned Events</div>
+    <a href="{{ url_for('faculty_assigned_events') }}" class="cems-btn cems-btn-outline cems-btn-sm">View All</a>
   </div>
-  <div class="stat-card">
-    <div class="stat-number">{{ total_registrations }}</div>
-    <div class="stat-label">Total Registrations</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-number">{{ pending_registrations }}</div>
-    <div class="stat-label">Pending Registrations</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-number">{{ approved_students }}</div>
-    <div class="stat-label">Approved Students</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-number">{{ total_attendance }}</div>
-    <div class="stat-label">Total Attendance</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-number">{{ certificates_generated }}</div>
-    <div class="stat-label">Certificates Generated</div>
+  <div class="cems-overflow-x-auto">
+    <table class="cems-table">
+      <thead><tr><th>Event</th><th>Date</th><th>Venue</th><th>Registrations</th><th>Attended</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for event in assigned_events[:6] %}
+        <tr>
+          <td><strong>{{ event.title }}</strong><br><span class="cems-text-muted" style="font-size:.78rem">{{ event.category }}</span></td>
+          <td>{{ event.date.strftime('%d %b %Y') if event.date else '—' }}</td>
+          <td>{{ event.venue }}</td>
+          <td>{{ event.registrations|length }}</td>
+          <td>{{ event.registrations|selectattr('attended')|list|length }}</td>
+          <td><span class="cems-badge {{ 'cems-badge-success' if event.status in ('approved', 'completed') else 'cems-badge-warning' }}">{{ event.status|replace('_', ' ')|title }}</span></td>
+          <td>
+            <div class="cems-table-actions">
+              <a class="cems-btn cems-btn-secondary cems-btn-sm" href="{{ url_for('teacher_event_details', event_id=event.id) }}">Details</a>
+              <a class="cems-btn cems-btn-primary cems-btn-sm" href="{{ url_for('teacher_attendance', event_id=event.id) }}">Attendance</a>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;padding:36px;color:var(--cems-text-muted)">No events assigned yet. Join an upcoming event below to start coordinating.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
 
-<div class="section-head"><h2>Assigned Events</h2><a href="{{ url_for('faculty_assigned_events') }}">View All</a></div>
-<div class="table-card"><table><thead><tr><th>Event</th><th>Date</th><th>Registrations</th><th>Status</th><th>Action</th></tr></thead><tbody>{% for event in assigned_events %}<tr><td>{{ event.title }}</td><td>{{ event.date.strftime('%d %b %Y') if event.date else '—' }}</td><td>{{ event.registrations|length }}</td><td><span class="status">{{ event.status|title }}</span></td><td><a href="{{ url_for('teacher_event_details', event_id=event.id) }}">View Details</a></td></tr>{% else %}<tr><td colspan="5" class="empty">No assigned events.</td></tr>{% endfor %}</tbody></table></div>
+<div class="cems-card" style="margin-bottom:28px;">
+  <div class="cems-card-header"><div class="cems-card-title">Events Open for Coordination</div></div>
+  <div class="cems-card-body">
+    {% if open_events %}
+    <div class="cems-card-grid">
+      {% for event in open_events %}
+      <div class="cems-card" style="padding:18px;">
+        <span class="cems-badge cems-badge-primary" style="position:static;display:inline-block;width:auto;height:auto;padding:2px 10px;border-radius:999px;border:none">{{ event.category }}</span>
+        <h3 style="font-size:1rem;margin:10px 0 6px">{{ event.title }}</h3>
+        <p class="cems-text-muted" style="font-size:.82rem;margin-bottom:12px">{{ event.date.strftime('%d %b %Y') }} · {{ event.start_time }} · {{ event.venue }}</p>
+        <form method="post" action="{{ url_for('faculty_join_event', event_id=event.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="cems-btn cems-btn-primary cems-btn-sm" type="submit">Coordinate this event</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="cems-text-muted">You are coordinating every upcoming event right now.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="cems-card">
+  <div class="cems-card-header">
+    <div class="cems-card-title">Latest Notices</div>
+    <a href="{{ url_for('faculty_notices') }}" class="cems-btn cems-btn-outline cems-btn-sm">Post / Manage Notices</a>
+  </div>
+  <div class="cems-card-body">
+    {% for notice in recent_notices %}
+    <a href="{{ url_for('board_notice_detail', notice_id=notice.id) }}" style="display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--cems-border-light);color:inherit;text-decoration:none">
+      <span><strong>{{ notice.title }}</strong><br><span class="cems-text-muted" style="font-size:.78rem">{{ notice.category }}</span></span>
+      <span class="cems-text-muted" style="font-size:.78rem;white-space:nowrap">{{ notice.published_at.strftime('%d %b %Y') }}</span>
+    </a>
+    {% else %}
+    <p class="cems-text-muted">No notices yet.</p>
+    {% endfor %}
+  </div>
+</div>
 {% endblock %}

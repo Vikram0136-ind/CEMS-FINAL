@@ -1,74 +1,61 @@
 {% extends "base.html" %}
 {% block title %}My Registrations — CEMS{% endblock %}
+{% block breadcrumb %}My Registrations{% endblock %}
+
 {% block content %}
-<div class="dashboard">
-  <aside class="sidebar">
-    <div class="side-brand">CEMS</div>
-    <a href="{{ url_for('student_dashboard') }}">▣ Dashboard</a>
-    <a href="{{ url_for('events') }}">◫ Events</a>
-    <a class="active" href="{{ url_for('my_registrations') }}">✓ My Registrations</a>
-    <a href="{{ url_for('my_tickets') }}">▣ My Tickets</a>
-    <a href="{{ url_for('student_notifications') }}">♢ Notifications</a>
-    <a href="{{ url_for('profile') }}">♙ Profile</a>
-    <a href="{{ url_for('logout') }}" data-logout>↪ Logout</a>
-  </aside>
-  <section class="dash-main">
-    <h1>My Registrations</h1>
-    <div class="table-card">
-      <table>
-        <thead>
-          <tr>
-            <th>Event</th>
-            <th>Date</th>
-            <th>Venue</th>
-            <th>Status</th>
-            <th>Payment</th>
-            <th>Reference</th>
-            <th>Feedback</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in registrations %}
-          {% set existing = r.feedbacks | first if r.feedbacks else none %}
-          <tr>
-            <td>{{ r.event.title }}</td>
-            <td>{{ r.event.date.strftime('%d %b %Y') if r.event.date else '—' }}</td>
-            <td>{{ r.event.venue }}</td>
-            <td>
-              <span class="status {{ 'success' if r.status=='confirmed' else 'danger' }}">{{ r.status|title }}</span>
-              {% if r.attended %} <span class="status info">Attended</span>{% endif %}
-            </td>
-            <td><span class="cems-badge {% if r.payment_status == 'paid' or r.payment_status == 'successful' %}cems-badge-success{% elif r.payment_status == 'pending' %}cems-badge-warning{% elif r.payment_status == 'free' %}cems-badge-neutral{% else %}cems-badge-neutral{% endif %}">{{ payment_display_status(r.payment_status) }}</span></td>
-            <td><span style="font-size:0.8rem; font-family:monospace;">{{ r.payment_record.transaction_id if r.payment_record else '—' }}</span></td>
-            <td>
-              {% if existing %}
-                <span style="color:var(--cems-success); font-weight:600;">✓ Submitted</span>
-                <span style="font-size:0.8rem; color:var(--cems-text-muted);">{{ existing.rating }}★</span>
-                {% if existing.is_anonymous %}
-                  <span class="status info" style="font-size:0.7rem;">Anon</span>
-                {% endif %}
-              {% elif r.attended and not existing %}
-                <span style="color:var(--cems-warning); font-size:0.8rem;">Pending</span>
-              {% else %}
-                <span style="color:var(--cems-text-muted); font-size:0.8rem;">N/A</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if r.attended and not existing %}
-                <a href="{{ url_for('feedback', registration_id=r.id) }}" class="cems-btn cems-btn-sm cems-btn-secondary" style="margin-bottom:8px;">Give Feedback</a>
-              {% elif r.attended and existing %}
-                <a href="{{ url_for('feedback', registration_id=r.id) }}" class="cems-btn cems-btn-sm cems-btn-outline">View Feedback</a>
-              {% else %}
-                <a href="{{ url_for('ticket', registration_id=r.id) }}">Ticket</a>
-                {% if r.attended %} · <a href="{{ url_for('certificate', registration_id=r.id) }}">Certificate</a>{% endif %}
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+<div class="cems-page-header">
+  <div class="cems-page-header-top">
+    <div>
+      <h1 class="cems-page-title">My Registrations</h1>
+      <p class="cems-page-description">Track your event registrations and attendance.</p>
     </div>
-  </section>
+    <div class="cems-page-actions">
+      <a href="{{ url_for('student_events') }}" class="cems-btn cems-btn-primary">Discover Events</a>
+    </div>
+  </div>
+</div>
+
+<div class="cems-card">
+  <div class="cems-overflow-x-auto">
+    <table class="cems-table">
+      <thead>
+        <tr>
+          <th>Event</th><th>Category</th><th>Date</th><th>Venue</th><th>Registered On</th><th>Status</th><th>Payment</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in registrations %}
+        {% set existing = r.feedbacks | first if r.feedbacks else none %}
+        <tr>
+          <td><a href="{{ url_for('event_details', event_id=r.event.id) }}" style="font-weight:700;color:inherit">{{ r.event.title }}</a></td>
+          <td><span class="cems-badge cems-badge-primary">{{ r.event.category }}</span></td>
+          <td>{{ r.event.date.strftime('%d %b %Y') if r.event.date else '—' }}</td>
+          <td>{{ r.event.venue }}</td>
+          <td>{{ r.registered_at.strftime('%d %b %Y') if r.registered_at else '—' }}</td>
+          <td>
+            {% set label = registration_display_status(r) %}
+            <span class="cems-badge {{ 'cems-badge-success' if label in ('Confirmed', 'Approved', 'Attended') else ('cems-badge-warning' if label == 'Pending' else 'cems-badge-danger') }}">{{ label }}</span>
+          </td>
+          <td><span class="cems-badge {{ 'cems-badge-success' if r.payment_status in ('paid', 'successful') else 'cems-badge-neutral' }}">{{ payment_display_status(r.payment_status) }}</span></td>
+          <td>
+            <div class="cems-table-actions">
+              <a href="{{ url_for('ticket', registration_id=r.id) }}" class="cems-btn cems-btn-outline cems-btn-sm">Ticket</a>
+              <a href="{{ url_for('ticket_download', registration_id=r.id) }}" class="cems-btn cems-btn-primary cems-btn-sm">Download</a>
+              {% if r.attended and not existing %}
+              <a href="{{ url_for('feedback', registration_id=r.id) }}" class="cems-btn cems-btn-secondary cems-btn-sm">Feedback</a>
+              {% elif existing %}
+              <span class="cems-badge cems-badge-success" title="Feedback submitted">{{ existing.rating }}★</span>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--cems-text-muted)">
+          You haven't registered for any events yet. <a href="{{ url_for('student_events') }}" style="font-weight:600">Discover events</a>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

@@ -44,7 +44,7 @@
             <td><span class="cems-badge cems-badge-primary">{{ e.category }}</span></td>
             <td>{{ e.date.strftime('%d %b %Y') if e.date else '—' }}</td>
             <td>{{ e.venue }}</td>
-            <td>{{ e.registrations|selectattr('status', 'notequalto', 'cancelled')|list|length }}</td>
+            <td>{{ e.registrations|selectattr('status', 'ne', 'cancelled')|list|length }}</td>
             <td>{{ (e.cancellation_reason or '')[:80] }}{% if e.cancellation_reason and e.cancellation_reason|length > 80 %}...{% endif %}</td>
             <td>
               <div class="cems-table-actions">

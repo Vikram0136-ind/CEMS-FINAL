@@ -3,9 +3,10 @@
 A GitHub-ready full-stack college project built with **HTML, CSS, JavaScript, Flask and SQLite**.
 
 ## Main roles
-- Student / Participant
-- Event Organizer
-- Admin
+- Student — register, discover events, tickets (QR), certificates, notices
+- Organizer — create events (draft / submit for approval), reports, check-in, QR scanner, volunteers/judges/sponsors
+- Faculty — create an account, coordinate events, mark attendance, complete events, post notices
+- Admin — approve events, manage users, venues, notices
 
 ## Included modules
 - Landing page and upcoming events
@@ -64,6 +65,9 @@ Open: http://127.0.0.1:5001
 - Admin: `admin@agc.local` / `Admin@123`
 - Organizer: `organizer@agc.local` / `Organizer@123`
 - Student: `student@agc.local` / `Student@123`
+- Faculty: `teacher@agc.local` / `Teacher@123`
+
+Students, organizers and faculty can also create their own accounts at `/register`. Demo event dates are generated relative to the first run.
 
 The app creates the database and demo data automatically on first run.
 

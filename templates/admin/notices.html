@@ -1,96 +1,65 @@
 {% extends "base.html" %}
-{% block title %}Notice Board — CEMS{% endblock %}
+{% block title %}Notice Board Management — CEMS{% endblock %}
+{% block breadcrumb %}Notices{% endblock %}
+
 {% block content %}
-<div class="dashboard">
-  <aside class="sidebar">
-    <div class="side-brand"><strong>⚙️ CEMS</strong><span>Admin Panel</span></div>
-    <nav>
-      <a href="{{ url_for('admin_dashboard') }}">📊 Dashboard</a>
-      <a href="{{ url_for('admin_users') }}">👥 Manage Users</a>
-      <a href="{{ url_for('admin_events') }}">📅 Manage Events</a>
-      <a href="{{ url_for('admin_registrations') }}">📋 Registrations</a>
-      <a href="{{ url_for('admin_reports') }}">📈 Reports</a>
-    </nav>
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">Settings</div>
-      <a class="active" href="{{ url_for('admin_notices') }}">🔔 Notices</a>
-      <a href="{{ url_for('admin_venues') }}">🏢 Venues</a>
+<div class="cems-page-header">
+  <div class="cems-page-header-top">
+    <div>
+      <h1 class="cems-page-title">Notice Board Management</h1>
+      <p class="cems-page-description">Create and manage campus notices.</p>
     </div>
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">Account</div>
-      <a href="{{ url_for('logout') }}" data-logout>🚪 Logout</a>
-    </div>
-  </aside>
-
-  <section class="dash-main">
-    <div class="dash-head">
-      <div>
-        <h1>Notice Board Management 🔔</h1>
-        <p style="color: #7b8495; margin: 5px 0 0;">Create and manage campus notices</p>
-      </div>
-    </div>
-
-    <div class="section">
-      <form method="post" enctype="multipart/form-data" class="form-card inline-card" style="margin-bottom:30px;">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label>Notice Title<input name="title" required placeholder="e.g. Annual Fest Completed"></label>
-        <label>Category<select name="category">
-          <option>Event Announcement</option><option>Event Completed</option><option>Competition Result</option>
-          <option>Workshop</option><option>Seminar</option><option>Cultural Event</option>
-          <option>Sports Event</option><option>Achievement</option><option>Important Notice</option>
-          <option>Campus Update</option>
-        </select></label>
-        <label>Related Event<select name="event_id"><option value="">None</option>{% for e in events %}<option value="{{ e.id }}">{{ e.title }}</option>{% endfor %}</select></label>
-        <label>Description<textarea name="description" rows="4" required></textarea></label>
-        <label>Notice Image<input type="file" name="image" accept="image/*"></label>
-        <button class="btn">Publish Notice</button>
-      </form>
-
-      <div style="overflow-x: auto;">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Category</th>
-              <th>Event</th>
-              <th>Published</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for n in notices %}
-            <tr>
-              <td><strong>{{ n.title }}</strong></td>
-              <td><span class="status-badge">{{ n.category }}</span></td>
-              <td>{{ n.event.title if n.event else '—' }}</td>
-              <td>{{ n.published_at.strftime('%d %b %Y') }}</td>
-              <td>
-                <a href="{{ url_for('board_notice_detail', notice_id=n.id) }}" class="action-btn">View</a>
-                <form method="post" action="{{ url_for('delete_notice', notice_id=n.id) }}" style="display: inline;" onsubmit="return confirm('Delete this notice?');">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button class="action-btn danger">Delete</button>
-                </form>
-              </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="5" style="text-align: center; padding: 30px;">No notices published yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% if pagination and pagination.pages > 1 %}
-      <div style="display:flex;justify-content:center;gap:8px;margin-top:30px;">
-        {% if pagination.has_prev %}
-        <a class="btn outline" href="{{ url_for('admin_notices', page=pagination.prev_num) }}">← Previous</a>
-        {% endif %}
-        <span style="align-self:center;font-size:13px;color:#7b8495;">Page {{ pagination.page }} of {{ pagination.pages }}</span>
-        {% if pagination.has_next %}
-        <a class="btn outline" href="{{ url_for('admin_notices', page=pagination.next_num) }}">Next →</a>
-        {% endif %}
-      </div>
-      {% endif %}
-    </div>
-  </section>
+  </div>
 </div>
-{% endblock %}
 
+<form method="post" enctype="multipart/form-data" class="cems-card" style="padding:24px;margin-bottom:24px;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <h2 style="font-size:1.05rem;font-weight:700;margin-bottom:16px;">Publish a Notice</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+    <div class="cems-form-group" style="grid-column:span 2"><label class="cems-form-label">Title</label><input name="title" class="cems-form-input" required placeholder="e.g. Annual Fest Completed"></div>
+    <div class="cems-form-group"><label class="cems-form-label">Category</label>
+      <select name="category" class="cems-form-select">{% for c in note_categories %}<option>{{ c }}</option>{% endfor %}</select></div>
+    <div class="cems-form-group"><label class="cems-form-label">Related Event</label>
+      <select name="event_id" class="cems-form-select"><option value="">None</option>{% for e in events %}<option value="{{ e.id }}">{{ e.title }}</option>{% endfor %}</select></div>
+    <div class="cems-form-group" style="grid-column:span 2"><label class="cems-form-label">Description</label><textarea name="description" rows="4" class="cems-form-input" required></textarea></div>
+    <div class="cems-form-group" style="grid-column:span 2"><label class="cems-form-label">Notice Image</label><input type="file" name="image" accept="image/*" class="cems-form-input"><small class="cems-form-hint">JPG, PNG, WEBP max 2MB</small></div>
+  </div>
+  <button class="cems-btn cems-btn-primary" type="submit">Publish Notice</button>
+</form>
+
+<div class="cems-card">
+  <div class="cems-overflow-x-auto">
+    <table class="cems-table">
+      <thead><tr><th>Title</th><th>Category</th><th>Event</th><th>Published</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for n in notices %}
+        <tr>
+          <td><strong>{{ n.title }}</strong></td>
+          <td><span class="cems-badge cems-badge-primary">{{ n.category }}</span></td>
+          <td>{{ n.event.title if n.event else '—' }}</td>
+          <td>{{ n.published_at.strftime('%d %b %Y') if n.published_at else '—' }}</td>
+          <td>
+            <div class="cems-table-actions">
+              <a href="{{ url_for('board_notice_detail', notice_id=n.id) }}" class="cems-btn cems-btn-outline cems-btn-sm">View</a>
+              <form method="post" action="{{ url_for('delete_notice', notice_id=n.id) }}" onsubmit="return confirm('Delete this notice?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="cems-btn cems-btn-danger cems-btn-sm" type="submit">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="text-align:center;padding:36px;color:var(--cems-text-muted)">No notices published yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% if pagination and pagination.pages > 1 %}
+<div class="cems-pagination" style="margin-top:16px">
+  {% if pagination.has_prev %}<a class="cems-pagination-btn" href="{{ url_for('admin_notices', page=pagination.prev_num) }}">← Previous</a>{% endif %}
+  <span class="cems-pagination-info">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+  {% if pagination.has_next %}<a class="cems-pagination-btn" href="{{ url_for('admin_notices', page=pagination.next_num) }}">Next →</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -5,13 +5,12 @@
 {% block extra_css %}
 <style>
 .cems-archive-hero {
-  background: linear-gradient(135deg, rgba(17,24,41,.95) 0%, rgba(17,24,41,.92) 100%);
-  border: 1px solid var(--cems-border);
-  border-radius: var(--cems-radius-xl);
-  padding: 28px 32px 22px;
+  background: none;
+  border: 0;
+  padding: 0;
   margin-bottom: 20px;
 }
-.cems-archive-hero h1 { margin: 0; font-size: 1.75rem; font-weight: 700; }
+.cems-archive-hero h1 { margin: 0; font-size: 1.75rem; font-weight: 800; color: var(--cems-text-primary); }
 .cems-archive-hero p { margin: 4px 0 0; color: var(--cems-text-secondary); font-size: .92rem; }
 .cems-archive-meta { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; color: var(--cems-text-secondary); font-size: .82rem; }
 .cems-archive-meta span { display: inline-flex; align-items: center; gap: 6px; }
@@ -110,7 +109,7 @@
       <img src="{{ img_url }}"
            alt="{{ event.title }}"
            loading="lazy"
-           onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\"cems-archive-card-placeholder\">{{ event.category[:2].upper() }}</div>';">
+           onerror="this.onerror=null;this.parentElement.innerHTML='<div class=&quot;cems-archive-card-placeholder&quot;>{{ event.category[:2].upper() }}</div>';">
     </a>
     <div class="cems-archive-card-body">
       <span class="cems-badge cems-badge-neutral cems-archive-results" {% if has_results %}style="display:inline-flex"{% else %}style="display:none"{% endif %}>📊 Results</span>

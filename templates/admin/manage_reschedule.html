@@ -119,7 +119,7 @@
   <div class="cems-card-header">
     <div class="cems-card-title">Registration Impact</div>
     <div class="cems-card-subtitle">
-      Approving this reschedule will notify {{ event.registrations|selectattr('status', 'notequalto', 'cancelled')|list|length }} registered student(s) with the new details.
+      Approving this reschedule will notify {{ event.registrations|selectattr('status', 'ne', 'cancelled')|list|length }} registered student(s) with the new details.
     </div>
   </div>
   <div class="cems-card-body">

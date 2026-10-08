@@ -19,21 +19,13 @@
 <div class="cems-card-grid">
   {% for notice in notices %}
   <article class="cems-notice-card">
-    {% if notice.image %}
     <div class="cems-notice-card-image-wrapper">
-      <img src="{{ image_url(notice.image) }}"
+      <img src="{{ image_url(notice.image) if notice.image else category_banner_url(notice.category) }}"
            alt="{{ notice.title }}"
            class="cems-notice-card-image"
            loading="lazy"
            onerror="this.onerror=null;this.src='{{ url_for('static', filename='images/placeholder.svg') }}';">
     </div>
-    {% else %}
-    <div class="cems-notice-card-image-wrapper">
-      <div class="cems-notice-card-image cems-notice-placeholder">
-        <span class="cems-notice-placeholder-icon">{{ notice.category[:1] }}</span>
-      </div>
-    </div>
-    {% endif %}
     <div class="cems-notice-card-body">
       <div class="cems-notice-card-category">{{ notice.category }}</div>
       <h3 class="cems-notice-card-title">{{ notice.title }}</h3>

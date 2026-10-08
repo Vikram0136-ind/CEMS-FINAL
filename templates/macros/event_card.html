@@ -19,7 +19,7 @@
 
 {# Compute seats left when not provided. #}
 {% if seats_left is none %}
-  {% set active_regs = event.registrations|selectattr('status', 'notequalto', 'cancelled')|list if event.registrations else [] %}
+  {% set active_regs = event.registrations|selectattr('status', 'ne', 'cancelled')|list if event.registrations else [] %}
   {% set seats_left = (event.capacity or 0) - (active_regs|length) %}
 {% endif %}
 
