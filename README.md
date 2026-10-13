@@ -28,6 +28,34 @@ A GitHub-ready full-stack college project built with **HTML, CSS, JavaScript, Fl
 - Venue management + volunteer, judge and sponsor management
 - Responsive UI matching the supplied CEMS reference screens
 
+## Extended modules (departments, competitions, community)
+
+| Area | Where | Who |
+| --- | --- | --- |
+| Department-wise dashboard (registrations, attendance ratio, winners, points; batch / semester / odd-even filters) | `/dashboard/departments` | admin, organizer, faculty |
+| Date-to-date report with time-of-day, department, batch, semester and odd/even filters + CSV export | `/reports/date-range` | admin, organizer, faculty |
+| Event lists: all / past / present (today) / future | `/events?when=all\|past\|present\|future` | everyone |
+| Department leaderboard, most-registered events, best attendance, which department performed in which event, top students | `/leaderboard` | all signed-in users |
+| Wishlist / saved events and registration-deadline countdown | event page, `/wishlist` | signed-in users |
+| Event reminders (24 h, event day, deadline) and instant cancellation / reschedule notifications | automatic | students, faculty, organizers |
+| Waitlist with automatic promotion when a seat opens or a registration is cancelled | register page, `/events/<id>/waitlist` | students |
+| Team registration with team leader, invite codes, min/max team size | register page, `/events/<id>/team` | students |
+| Duplicate student-ID / roll-number detection (sign-up, registration, report) | `/duplicates` | admin, organizer |
+| Entry / exit time tracking with time-inside per participant | `/entry-exit` | admin, organizer, faculty |
+| Faculty attendance history and faculty-wise event reports | `/faculty/attendance-history`, `/reports/faculty` | faculty, admin, organizer |
+| Rounds, judge panel, judge score entry, automatic winner calculation, multiple winner categories, winner panel | `/events/<id>/competition`, `/judge` | organizer, admin, faculty judges |
+| Separate participation and winner certificates (both verifiable) | `/student/certificates` | students |
+| Student achievement points (+10 attend, +50/+35/+25 for 1st/2nd/3rd, +20 other winner categories) | `/student/achievements` | students |
+| Campus chatbot (floating 💬 on every page) and community Q&A that students, organizers and faculty answer together | `/community`, `/assistant` | all roles |
+
+Reminders are sent by a throttled background check on normal traffic. To run them on a schedule (recommended in production) add a cron job that calls
+
+```bash
+flask --app app send-reminders
+```
+
+Existing databases are upgraded automatically on start-up (new tables and columns are added; nothing is dropped).
+
 ## Quick start (macOS / Linux)
 
 ```bash

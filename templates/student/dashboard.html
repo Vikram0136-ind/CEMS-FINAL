@@ -24,6 +24,20 @@
   <div class="cems-stat-card"><div class="cems-stat-icon warning">{{ icon('board', 24) }}</div><div class="cems-stat-content"><div class="cems-stat-value">{{ uploaded_images_count }}</div><div class="cems-stat-label">My Uploaded Images</div></div></div>
 </div>
 
+<div class="cems-stats-grid cems-stats-grid-5">
+  <div class="cems-stat-card"><div class="cems-stat-icon warning">{{ icon('award', 24) }}</div><div class="cems-stat-content"><div class="cems-stat-value">{{ my_points }}</div><div class="cems-stat-label"><a href="{{ url_for('features.achievements') }}">Achievement points</a></div></div></div>
+  <div class="cems-stat-card"><div class="cems-stat-icon success">{{ icon('chart', 24) }}</div><div class="cems-stat-content"><div class="cems-stat-value">{{ attendance_rate }}%</div><div class="cems-stat-label">Attendance rate ({{ regs }} : {{ attended }})</div></div></div>
+  <div class="cems-stat-card"><div class="cems-stat-icon info">{{ icon('board', 24) }}</div><div class="cems-stat-content"><div class="cems-stat-value">{{ wishlist_count }}</div><div class="cems-stat-label"><a href="{{ url_for('features.wishlist') }}">Saved events</a></div></div></div>
+  <div class="cems-stat-card"><div class="cems-stat-icon primary">{{ icon('clock', 24) }}</div><div class="cems-stat-content"><div class="cems-stat-value">{{ waitlisted_count }}</div><div class="cems-stat-label">On waitlist</div></div></div>
+</div>
+
+{% if deadline_soon %}
+<div class="cems-alert cems-alert-warning" style="margin-bottom:24px">
+  <div><strong>Registration closing soon:</strong>
+  {% for e in deadline_soon %}<a href="{{ url_for('event_details', event_id=e.id) }}">{{ e.title }}</a> <span class="xm-countdown" data-deadline="{{ deadline_iso(e) }}">{{ deadline_label(e) }}</span>{% if not loop.last %} · {% endif %}{% endfor %}</div>
+</div>
+{% endif %}
+
 {% if pending_feedbacks %}
 <div class="cems-card" style="margin-bottom:24px">
   <div class="cems-card-header"><div class="cems-card-title">Feedback Required</div><a href="{{ url_for('student_feedback_list') }}" class="cems-btn cems-btn-sm cems-btn-outline">View All</a></div>

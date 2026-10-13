@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Saved Events — CEMS{% endblock %}
+{% block breadcrumb %}Saved Events{% endblock %}
+
+{% block content %}
+<div class="cems-page-header">
+  <div class="cems-page-header-top">
+    <div><h1 class="cems-page-title">Saved Events</h1><p class="cems-page-description">Your wishlist. You get a reminder before registration closes for events you saved.</p></div>
+    <div class="cems-page-actions"><a class="cems-btn cems-btn-primary" href="{{ url_for('events', when='future') }}">Find more events</a></div>
+  </div>
+</div>
+{% if items %}
+<div class="cems-card"><div class="cems-overflow-x-auto"><table class="cems-table">
+  <thead><tr><th>Event</th><th>Date</th><th>Registration</th><th>Seats</th><th></th></tr></thead>
+  <tbody>
+  {% for item in items %}{% set e = item.event %}
+    <tr>
+      <td><a href="{{ url_for('event_details', event_id=e.id) }}"><strong>{{ e.title }}</strong></a><div class="xm-small xm-muted">{{ e.category }} · {{ e.venue }}</div></td>
+      <td>{{ e.date.strftime('%d %b %Y') }}</td>
+      <td>
+        {% if e.status == 'cancelled' %}<span class="cems-badge cems-badge-danger">Cancelled</span>
+        {% elif e.date < today %}<span class="cems-badge cems-badge-neutral">Event over</span>
+        {% elif e.id in registered %}<span class="cems-badge cems-badge-success">{{ 'On waitlist' if registered[e.id].status == 'waitlisted' else 'Registered' }}</span>
+        {% elif e.registration_deadline %}<span class="xm-countdown" data-deadline="{{ deadline_iso(e) }}">{{ deadline_label(e) }}</span>
+        {% else %}<span class="cems-badge cems-badge-info">Open</span>{% endif %}
+      </td>
+      <td>{{ seats_left(e) }} / {{ e.capacity }}</td>
+      <td class="xm-actions">
+        <a class="cems-btn cems-btn-sm cems-btn-primary" href="{{ url_for('event_details', event_id=e.id) }}">View</a>
+        <form method="post" action="{{ url_for('features.toggle_wishlist', event_id=e.id) }}" class="xm-inline"><input type="hidden" name="next" value="{{ url_for('features.wishlist') }}"><button class="cems-btn cems-btn-sm cems-btn-outline" type="submit">Remove</button></form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody></table></div></div>
+{% else %}
+<div class="cems-empty"><div class="cems-empty-icon">🔖</div><div class="cems-empty-title">Nothing saved yet</div><div class="cems-empty-description">Open any event and press “Save event” to keep it here.</div></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% from 'features/_macros.html' import rate_bar, stat, participant_filters, status_badge %}
+{% block title %}Date-to-Date Report — CEMS{% endblock %}
+{% block breadcrumb %}Date-to-Date Report{% endblock %}
+
+{% block content %}
+<div class="cems-page-header">
+  <div class="cems-page-header-top">
+    <div>
+      <h1 class="cems-page-title">Date-to-Date Report</h1>
+      <p class="cems-page-description">Events between {{ r.date_from.strftime('%d %b %Y') }} and {{ r.date_to.strftime('%d %b %Y') }}{% if r.from_time or r.to_time %}, starting {{ r.from_time or '00:00' }}–{{ r.to_time or '23:59' }}{% endif %}. Filter by department, batch, semester or odd/even semester.</p>
+    </div>
+    <div class="cems-page-actions xm-actions">
+      <a class="cems-btn cems-btn-outline" href="{{ url_for('features.date_report', **dict(request.args.to_dict(), export='events')) }}">Export events CSV</a>
+      <a class="cems-btn cems-btn-outline" href="{{ url_for('features.date_report', **dict(request.args.to_dict(), export='participants')) }}">Export participants CSV</a>
+    </div>
+  </div>
+</div>
+
+<div class="xm-presets">
+  {% for label, start, end in presets %}
+  <a class="cems-btn cems-btn-sm cems-btn-ghost" href="{{ url_for('features.date_report', **dict(r.flt.as_params(), **{'from': start.isoformat(), 'to': end.isoformat()})) }}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+<form method="get" class="cems-card cems-card-body xm-filter-bar" style="padding:16px">
+  <div class="cems-form-group"><label for="f-from">From date</label><input id="f-from" type="date" name="from" class="cems-form-input" value="{{ r.date_from.isoformat() }}"></div>
+  <div class="cems-form-group"><label for="f-to">To date</label><input id="f-to" type="date" name="to" class="cems-form-input" value="{{ r.date_to.isoformat() }}"></div>
+  <div class="cems-form-group"><label for="f-ft">Start time from</label><input id="f-ft" type="time" name="from_time" class="cems-form-input" value="{{ r.from_time }}"></div>
+  <div class="cems-form-group"><label for="f-tt">Start time to</label><input id="f-tt" type="time" name="to_time" class="cems-form-input" value="{{ r.to_time }}"></div>
+  <div class="cems-form-group"><label for="f-cat">Category</label>
+    <select id="f-cat" name="category" class="cems-form-select"><option value="">All categories</option>
+    {% for c in r.categories %}<option value="{{ c }}" {% if r.category == c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></div>
+  {{ participant_filters(r.flt, r.options) }}
+  <button class="cems-btn cems-btn-primary" type="submit">Apply</button>
+  <a class="cems-btn cems-btn-ghost" href="{{ url_for('features.date_report') }}">Reset</a>
+</form>
+
+<div class="cems-stats-grid" style="margin-top:20px">
+  {{ stat('Events', r.events_count, hint=(r.cancelled ~ ' cancelled') if r.cancelled else '') }}
+  {{ stat('Registered', r.totals.registered) }}
+  {{ stat('Attended', r.totals.attended) }}
+  {{ stat('Attendance rate', r.totals.rate ~ '%', hint='Registered : Attended = ' ~ r.totals.ratio) }}
+  {{ stat('Waitlisted', r.totals.waitlisted) }}
+</div>
+
+<div class="cems-card xm-section">
+  <div class="cems-card-header"><div class="cems-card-title">Events in range</div></div>
+  <div class="cems-overflow-x-auto">
+    <table class="cems-table">
+      <thead><tr><th>Event</th><th>Date &amp; time</th><th>Category</th><th>Status</th><th>Registered</th><th>Attended</th><th>Reg : Att</th><th>Attendance rate</th><th>Winners</th></tr></thead>
+      <tbody>
+      {% for row in r.rows %}
+        <tr>
+          <td><a href="{{ url_for('event_details', event_id=row.event.id) }}"><strong>{{ row.event.title }}</strong></a><div class="xm-small xm-muted">{{ row.event.venue }}</div></td>
+          <td>{{ row.event.date.strftime('%d %b %Y') }}<div class="xm-small xm-muted">{{ row.event.start_time }}</div></td>
+          <td>{{ row.event.category }}</td>
+          <td>{{ status_badge(row.event.status) }}</td>
+          <td>{{ row.stats.registered }}{% if row.stats.waitlisted %} <span class="xm-small xm-muted">(+{{ row.stats.waitlisted }} waiting)</span>{% endif %}</td>
+          <td>{{ row.stats.attended }}</td>
+          <td>{{ row.stats.ratio }}</td>
+          <td>{{ rate_bar(row.stats.rate) }}</td>
+          <td>{{ row.winners or '—' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="9" style="text-align:center;padding:32px" class="xm-muted">No events match these filters.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="cems-grid cems-grid-3 xm-section">
+  {% for title, rows in (('By department', r.by_dept), ('By batch', r.by_batch), ('By semester (odd / even)', r.by_semester)) %}
+  <div class="cems-card">
+    <div class="cems-card-header"><div class="cems-card-title">{{ title }}</div></div>
+    <div class="cems-overflow-x-auto">
+      <table class="cems-table"><thead><tr><th>{{ title.split(' ')[1]|title }}</th><th>Reg</th><th>Att</th><th>Rate</th></tr></thead><tbody>
+      {% for row in rows %}<tr><td>{{ row.label }}</td><td>{{ row.registered }}</td><td>{{ row.attended }}</td><td>{{ row.rate }}%</td></tr>
+      {% else %}<tr><td colspan="4" class="xm-muted" style="text-align:center">No participants</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

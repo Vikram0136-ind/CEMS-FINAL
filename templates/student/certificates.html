@@ -20,7 +20,7 @@
   <div class="cems-card">
     <div class="cems-card-header">
       <div class="cems-card-title">{{ reg.event.title }}</div>
-      <span class="cems-badge cems-badge-success">{{ reg.event.category }}</span>
+      <span class="cems-badge {{ 'cems-badge-warning' if cert.kind == 'winner' else 'cems-badge-success' }}">{{ '🏆 Winner' if cert.kind == 'winner' else reg.event.category }}</span>
     </div>
     <div class="cems-card-body">
       <div style="display:grid; gap:10px; margin-bottom:16px;">
@@ -50,10 +50,10 @@
         </div>
       </div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <a href="{{ url_for('certificate_preview', registration_id=reg.id) }}" class="cems-btn cems-btn-secondary cems-btn-sm" aria-label="Preview certificate for {{ reg.event.title }}">
+        <a href="{{ url_for('certificate_preview', registration_id=reg.id, type=cert.kind) }}" class="cems-btn cems-btn-secondary cems-btn-sm" aria-label="Preview certificate for {{ reg.event.title }}">
           Preview
         </a>
-        <a href="{{ url_for('certificate', registration_id=reg.id) }}" class="cems-btn cems-btn-primary cems-btn-sm" aria-label="Download certificate for {{ reg.event.title }}">
+        <a href="{{ url_for('certificate', registration_id=reg.id, type=cert.kind) }}" class="cems-btn cems-btn-primary cems-btn-sm" aria-label="Download certificate for {{ reg.event.title }}">
           Download PDF
         </a>
         <a href="{{ url_for('verify_certificate', code=cert.certificate_code) }}" class="cems-btn cems-btn-outline cems-btn-sm" target="_blank" rel="noopener" aria-label="Verify certificate {{ cert.certificate_code }} (opens in new tab)">
@@ -74,7 +74,7 @@
   <div class="cems-card-body" style="text-align:center; padding:48px;">
     <svg width="48" height="48" fill="none" stroke="var(--cems-text-muted)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0zM12 17v4m-3-3h6"></path></svg>
     <h3 style="margin:16px 0 8px; color:var(--cems-text-primary);">No certificates yet</h3>
-    <p style="color:var(--cems-text-muted);">Complete an approved event and check in to earn a certificate.</p>
+    <p style="color:var(--cems-text-muted);">Attend an approved event to earn a participation certificate, or win one to earn a winner certificate.</p>
   </div>
 </div>
 {% endif %}

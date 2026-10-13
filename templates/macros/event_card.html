@@ -109,7 +109,7 @@
         {% elif seats_left <= 0 %}
         <span class="cems-event-card-reg-badge reg-full">Full</span>
         {% else %}
-        <span class="cems-event-card-reg-badge reg-open">{{ seats_left }} seats left</span>
+        <span class="cems-event-card-reg-badge reg-open">{{ seats_left }} seats left{% if event.registration_deadline %} · {{ deadline_label(event) }}{% endif %}</span>
         {% endif %}
       </div>
       {% endif %}

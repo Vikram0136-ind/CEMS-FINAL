@@ -32,6 +32,9 @@
         <span style="color: var(--cems-success);">{{ student_waitlist.status | title }}</span> — You have been promoted!
         {% endif %}
       </p>
+      <form method="post" action="{{ url_for('features.student_cancel_registration', registration_id=student_waitlist.registration.id) }}" data-confirm="Leave the waitlist?" style="margin-bottom:12px">
+        <button type="submit" class="cems-btn cems-btn-outline cems-btn-sm">Leave waitlist</button>
+      </form>
       <div class="cems-text-center">
         <div style="display: flex; gap: 24px; justify-content: center; margin-top: 20px;">
           <div class="cems-text-center">

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Community Q&A — CEMS{% endblock %}
+{% block breadcrumb %}Community Q&A{% endblock %}
+
+{% block content %}
+<div class="cems-page-header"><div><h1 class="cems-page-title">Community Q&amp;A</h1>
+  <p class="cems-page-description">Ask anything about campus events. Students, organizers and faculty answer each other — from anywhere. Not sure? Try the 💬 assistant first.</p></div></div>
+
+<div class="cems-grid cems-grid-2" style="align-items:start">
+  <div>
+    <form method="get" class="xm-filter-bar">
+      <div class="cems-form-group" style="flex:3"><label for="cq">Search questions</label><input id="cq" name="q" class="cems-form-input" value="{{ q }}" maxlength="100" placeholder="Search…"></div>
+      <div class="cems-form-group"><label for="cv">Show</label><select id="cv" name="view" class="cems-form-select" onchange="this.form.submit()">
+        {% for key, label in (('all','All'),('open','Unanswered / open'),('solved','Solved'),('mine','My questions')) %}<option value="{{ key }}" {% if view == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <button class="cems-btn cems-btn-primary" type="submit">Search</button>
+    </form>
+    {% for item in questions.items %}
+    <a class="xm-question" href="{{ url_for('features.community_detail', question_id=item.id) }}">
+      <div style="display:flex;justify-content:space-between;gap:8px"><strong>{{ item.title }}</strong>
+        <span class="cems-badge {{ 'cems-badge-success' if item.is_resolved else ('cems-badge-warning' if not item.answers else 'cems-badge-info') }}">{{ 'Solved' if item.is_resolved else (item.answers|length ~ ' answers' if item.answers else 'Open') }}</span></div>
+      <div class="xm-small xm-muted">{{ item.author.name }} · {{ item.author.role|title }} · {{ item.created_at.strftime('%d %b %Y') }}{% if item.event %} · {{ item.event.title }}{% endif %}</div>
+    </a>
+    {% else %}<div class="cems-empty"><div class="cems-empty-icon">💬</div><div class="cems-empty-title">No questions found</div><div class="cems-empty-description">Be the first to ask.</div></div>{% endfor %}
+    {% if questions.pages > 1 %}<div class="cems-pagination">
+      {% if questions.has_prev %}<a class="cems-pagination-btn" href="{{ url_for('features.community', page=questions.prev_num, q=q, view=view) }}">← Previous</a>{% endif %}
+      <span class="cems-pagination-info">Page {{ questions.page }} of {{ questions.pages }}</span>
+      {% if questions.has_next %}<a class="cems-pagination-btn" href="{{ url_for('features.community', page=questions.next_num, q=q, view=view) }}">Next →</a>{% endif %}</div>{% endif %}
+  </div>
+
+  <div class="cems-card"><div class="cems-card-header"><div class="cems-card-title">Ask a question</div></div>
+    <form method="post" action="{{ url_for('features.community_ask') }}" class="cems-card-body">
+      <div class="cems-form-group"><label class="cems-form-label" for="at">Your question</label><input id="at" name="title" class="cems-form-input" required minlength="5" maxlength="200" value="{{ prefill }}" placeholder="e.g. Can I join the hackathon without a team?"></div>
+      <div class="cems-form-group"><label class="cems-form-label" for="ab">Details (optional)</label><textarea id="ab" name="body" class="cems-form-input" rows="4" maxlength="3000"></textarea></div>
+      <div class="cems-form-group"><label class="cems-form-label" for="ae">Related event (optional)</label><select id="ae" name="event_id" class="cems-form-select"><option value="">None</option>{% for e in events %}<option value="{{ e.id }}">{{ e.title }}</option>{% endfor %}</select></div>
+      <button class="cems-btn cems-btn-primary" type="submit">Post question</button>
+    </form></div>
+</div>
+{% endblock %}

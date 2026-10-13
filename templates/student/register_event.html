@@ -41,11 +41,16 @@
       {% if eligibility.reason == "already_registered" and existing_registration %}
         <div style="text-align: center; padding: 28px 12px;">
           <div style="font-size: 3rem; margin-bottom: 14px;">🎟️</div>
-          <h2 style="color: var(--cems-success); margin-bottom: 8px;">Already Registered</h2>
+          <h2 style="color: var(--cems-success); margin-bottom: 8px;">{{ 'On the Waitlist' if existing_registration.status == 'waitlisted' else 'Already Registered' }}</h2>
           <p style="color: var(--cems-text-secondary); margin-bottom: 22px; font-size: 0.95rem;">
             {{ eligibility.message }}
           </p>
+          {% if existing_registration.status == 'waitlisted' %}
+          <a href="{{ url_for('features.waitlist_status', event_id=event.id) }}" class="cems-btn cems-btn-primary">View Waitlist Position</a>
+          {% else %}
           <a href="{{ url_for('ticket', registration_id=existing_registration.id) }}" class="cems-btn cems-btn-primary">View Your Ticket</a>
+          {% if event.is_team_event %}<a href="{{ url_for('features.team_page', event_id=event.id) }}" class="cems-btn cems-btn-outline" style="margin-left:10px">My Team</a>{% endif %}
+          {% endif %}
           <a href="{{ url_for('my_registrations') }}" class="cems-btn cems-btn-ghost cems-btn-sm" style="margin-left: 10px;">My Registrations</a>
         </div>
       {% else %}
@@ -63,7 +68,16 @@
           <p style="color: var(--cems-text-secondary); margin: 18px 0; font-size: 1rem; line-height: 1.5;">
             {{ eligibility.message }}
           </p>
-          {% if eligibility.reason in ("event_past", "deadline_passed", "event_unavailable", "event_not_approved", "event_full", "registration_not_open") %}
+          {% if can_waitlist %}
+            <form method="post" style="max-width:420px;margin:0 auto 14px;text-align:left">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="action" value="waitlist">
+              <p class="xm-small xm-muted">Join the waitlist and you will be promoted automatically, first come first served, if someone cancels.{% if event.fee %} Payment is requested once you get a seat.{% endif %}</p>
+              <label class="cems-form-label" style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px"><input type="checkbox" name="terms_accepted" required style="margin-top:4px"><span>I accept the event rules and cancellation policy.</span></label>
+              <button type="submit" class="cems-btn cems-btn-warning cems-w-full">Join waitlist</button>
+            </form>
+          {% endif %}
+          {% if eligibility.reason in ("event_past", "deadline_passed", "event_unavailable", "event_not_approved", "event_full", "registration_not_open", "duplicate_id") %}
             <a href="{{ url_for('events') }}" class="cems-btn cems-btn-ghost cems-btn-sm">Browse other events</a>
           {% elif eligibility.reason in ("not_eligible", "account_inactive") %}
             <a href="{{ url_for('profile') }}" class="cems-btn cems-btn-ghost cems-btn-sm">Update profile</a>
@@ -72,6 +86,23 @@
       {% endif %}
 
     {# ---- Success / registration form — only shown when eligible ---- #}
+    {% elif event.is_team_event %}
+      <p style="margin-bottom:16px">This is a <strong>team event</strong> — teams of {{ team_min }}–{{ team_max }} members. Create a team and become its leader, or join a friend's team with their invite code.</p>
+      <div class="cems-grid cems-grid-2">
+        <form method="post" action="{{ url_for('features.team_create', event_id=event.id) }}" class="cems-form-grid">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <h3 style="margin:0 0 8px">Create a team</h3>
+          <div class="cems-form-group"><label class="cems-form-label" for="team_name">Team name</label><input id="team_name" name="team_name" class="cems-form-input" required minlength="3" maxlength="80" placeholder="e.g. Byte Bandits"></div>
+          <label class="cems-form-label" style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px"><input type="checkbox" name="terms_accepted" required style="margin-top:4px"><span>I accept the event rules and cancellation policy.</span></label>
+          <button type="submit" class="cems-btn cems-btn-primary cems-w-full">{{ 'Create team & continue to payment' if event.fee else 'Create team' }}</button>
+        </form>
+        <form method="post" action="{{ url_for('features.team_join', event_id=event.id) }}" class="cems-form-grid">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <h3 style="margin:0 0 8px">Join with invite code</h3>
+          <div class="cems-form-group"><label class="cems-form-label" for="invite_code">Invite code</label><input id="invite_code" name="invite_code" class="cems-form-input" required maxlength="16" autocomplete="off" style="text-transform:uppercase;letter-spacing:.15em"></div>
+          <button type="submit" class="cems-btn cems-btn-outline cems-w-full">Join team</button>
+        </form>
+      </div>
     {% else %}
       <form method="post" class="cems-form-grid">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

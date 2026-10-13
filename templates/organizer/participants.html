@@ -165,6 +165,17 @@
 <script>
 const EVENT_ID = {{ event.id }};
 
+function esc(value) {
+  const div = document.createElement('div');
+  div.textContent = value == null ? '' : String(value);
+  return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function csrfHeaders() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  return { 'X-CSRFToken': meta ? meta.getAttribute('content') : '', 'X-Requested-With': 'XMLHttpRequest' };
+}
+
 function statusBadge(status) {
   const map = {
     approved: 'cems-badge-success', confirmed: 'cems-badge-success',
@@ -172,12 +183,12 @@ function statusBadge(status) {
     rejected: 'cems-badge-danger', cancelled: 'cems-badge-neutral',
   };
   const label = (status || 'unknown').replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
-  return `<span class="cems-badge ${map[status] || 'cems-badge-neutral'}">${label}</span>`;
+  return `<span class="cems-badge ${map[status] || 'cems-badge-neutral'}">${esc(label)}</span>`;
 }
 
 function paymentBadge(status) {
   const cls = status === 'paid' || status === 'successful' ? 'cems-badge-success' : 'cems-badge-neutral';
-  return `<span class="cems-badge ${cls}">${(status || 'free').replace(/\b\w/g, c => c.toUpperCase())}</span>`;
+  return `<span class="cems-badge ${cls}">${esc((status || 'free').replace(/\b\w/g, c => c.toUpperCase()))}</span>`;
 }
 
 function attendedBadge(attended) {
@@ -186,18 +197,30 @@ function attendedBadge(attended) {
 }
 
 function showToast(message, type = 'success') {
-  const region = document.querySelector('.toast-region');
+  let region = document.querySelector('.toast-region');
   if (!region) {
-    const div = document.createElement('div');
-    div.className = 'toast-region';
-    div.setAttribute('aria-live', 'polite');
-    document.body.appendChild(div);
-    region = div;
+    region = document.createElement('div');
+    region.className = 'toast-region';
+    region.setAttribute('aria-live', 'polite');
+    document.body.appendChild(region);
   }
   const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
+  toast.className = `toast toast-${['success', 'danger', 'info', 'warning'].includes(type) ? type : 'info'}`;
   toast.setAttribute('role', 'status');
-  toast.innerHTML = `<span class="toast-copy"><strong>${type.title()}</strong><span>${message}</span></span><button class="toast-close" type="button" data-toast-close aria-label="Dismiss">×</button>`;
+  const copy = document.createElement('span');
+  copy.className = 'toast-copy';
+  const title = document.createElement('strong');
+  title.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+  const text = document.createElement('span');
+  text.textContent = message;
+  copy.append(title, text);
+  const close = document.createElement('button');
+  close.className = 'toast-close';
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Dismiss');
+  close.textContent = '×';
+  close.addEventListener('click', () => toast.remove());
+  toast.append(copy, close);
   region.appendChild(toast);
   setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 5000);
 }
@@ -211,7 +234,7 @@ async function loadParticipants() {
     const params = new URLSearchParams();
     if (search) params.set('q', search);
     if (status) params.set('status', status);
-    const resp = await fetch(`/api/organizer/${EVENT_ID}/participants?${params.toString()}`);
+    const resp = await fetch(`/api/organizer/${EVENT_ID}/participants?${params.toString()}`, { credentials: 'same-origin' });
     const data = await resp.json();
     if (!data.success) {
       tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--cems-text-muted);">Failed to load participants.</td></tr>';
@@ -232,25 +255,25 @@ async function loadParticipants() {
     }
     tbody.innerHTML = data.registrations.map(r => `
       <tr>
-        <td><strong>${r.student_name}</strong></td>
-        <td>${r.email}</td>
-        <td>${r.roll_no}</td>
-        <td><code style="background:var(--cems-surface-soft);padding:2px 6px;border-radius:4px;font-size:0.85rem;">${r.ticket_code}</code></td>
+        <td><strong>${esc(r.student_name)}</strong></td>
+        <td>${esc(r.email)}</td>
+        <td>${esc(r.roll_no)}</td>
+        <td><code style="background:var(--cems-surface-soft);padding:2px 6px;border-radius:4px;font-size:0.85rem;">${esc(r.ticket_code)}</code></td>
         <td>${statusBadge(r.status)}</td>
         <td>${paymentBadge(r.payment_status)}</td>
         <td>${attendedBadge(r.attended)}</td>
-        <td>${r.registered_at}</td>
+        <td>${esc(r.registered_at)}</td>
         <td>
           <div class="cems-table-actions">
             ${r.status === 'pending' || r.status === 'waitlisted' ? `
-              <button class="cems-btn cems-btn-success cems-btn-sm" onclick="approveRegistration(${r.id})">Approve</button>
-              <button class="cems-btn cems-btn-danger cems-btn-sm" onclick="rejectRegistration(${r.id})">Reject</button>
+              <button class="cems-btn cems-btn-success cems-btn-sm" onclick="approveRegistration(${Number(r.id)})">Approve</button>
+              <button class="cems-btn cems-btn-danger cems-btn-sm" onclick="rejectRegistration(${Number(r.id)})">Reject</button>
             ` : ''}
             ${r.status === 'approved' || r.status === 'confirmed' ? `
-              <button class="cems-btn cems-btn-info cems-btn-sm" onclick="markAttendance(${r.id})">${r.attended ? 'Re-mark' : 'Check-in'}</button>
-              <button class="cems-btn cems-btn-danger cems-btn-sm" onclick="cancelRegistration(${r.id})">Cancel</button>
+              <button class="cems-btn cems-btn-info cems-btn-sm" onclick="markAttendance(${Number(r.id)})">${r.attended ? 'Re-mark' : 'Check-in'}</button>
+              <button class="cems-btn cems-btn-danger cems-btn-sm" onclick="cancelRegistration(${Number(r.id)})">Cancel</button>
             ` : ''}
-            <a href="/ticket?registration_id=${r.id}" class="cems-btn cems-btn-secondary cems-btn-sm" target="_blank">Ticket</a>
+            <a href="/ticket/${Number(r.id)}" class="cems-btn cems-btn-secondary cems-btn-sm" target="_blank">Ticket</a>
           </div>
         </td>
       </tr>
@@ -263,7 +286,7 @@ async function loadParticipants() {
 async function approveRegistration(regId) {
   if (!confirm('Approve this registration?')) return;
   try {
-    const resp = await fetch(`/api/organizer/${EVENT_ID}/approve-registration/${regId}`, { method: 'POST', headers: { 'X-CSRFToken': document.querySelector('input[name="csrf_token"]')?.value || '' } });
+    const resp = await fetch(`/api/organizer/${EVENT_ID}/approve-registration/${regId}`, { method: 'POST', headers: csrfHeaders() });
     const data = await resp.json();
     if (data.success) {
       showToast(data.message, 'success');
@@ -278,7 +301,7 @@ async function rejectRegistration(regId) {
   const reason = prompt('Enter rejection reason (optional):');
   if (reason === null) return;
   try {
-    const resp = await fetch(`/api/organizer/${EVENT_ID}/reject-registration/${regId}`, { method: 'POST', headers: { 'X-CSRFToken': document.querySelector('input[name="csrf_token"]')?.value || '' }, body: new URLSearchParams({ reason }) });
+    const resp = await fetch(`/api/organizer/${EVENT_ID}/reject-registration/${regId}`, { method: 'POST', headers: csrfHeaders(), body: new URLSearchParams({ reason }) });
     const data = await resp.json();
     if (data.success) {
       showToast(data.message, 'success');
@@ -294,7 +317,7 @@ async function cancelRegistration(regId) {
   const reason = prompt('Enter cancellation reason (optional):');
   if (reason === null) return;
   try {
-    const resp = await fetch(`/api/organizer/${EVENT_ID}/cancel-registration/${regId}`, { method: 'POST', headers: { 'X-CSRFToken': document.querySelector('input[name="csrf_token"]')?.value || '' }, body: new URLSearchParams({ reason }) });
+    const resp = await fetch(`/api/organizer/${EVENT_ID}/cancel-registration/${regId}`, { method: 'POST', headers: csrfHeaders(), body: new URLSearchParams({ reason }) });
     const data = await resp.json();
     if (data.success) {
       showToast(data.message, 'success');
@@ -307,7 +330,7 @@ async function cancelRegistration(regId) {
 
 async function markAttendance(regId) {
   try {
-    const resp = await fetch(`/api/organizer/${EVENT_ID}/mark-attendance/${regId}`, { method: 'POST', headers: { 'X-CSRFToken': document.querySelector('input[name="csrf_token"]')?.value || '' } });
+    const resp = await fetch(`/api/organizer/${EVENT_ID}/mark-attendance/${regId}`, { method: 'POST', headers: csrfHeaders() });
     const data = await resp.json();
     if (data.success) {
       showToast(data.message, data.already_attended ? 'info' : 'success');

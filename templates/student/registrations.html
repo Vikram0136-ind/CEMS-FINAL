@@ -34,13 +34,24 @@
           <td>{{ r.registered_at.strftime('%d %b %Y') if r.registered_at else '—' }}</td>
           <td>
             {% set label = registration_display_status(r) %}
-            <span class="cems-badge {{ 'cems-badge-success' if label in ('Confirmed', 'Approved', 'Attended') else ('cems-badge-warning' if label == 'Pending' else 'cems-badge-danger') }}">{{ label }}</span>
+            <span class="cems-badge {{ 'cems-badge-success' if label in ('Confirmed', 'Approved', 'Attended') else ('cems-badge-warning' if label in ('Pending', 'Waitlisted') else 'cems-badge-danger') }}">{{ label }}</span>
           </td>
           <td><span class="cems-badge {{ 'cems-badge-success' if r.payment_status in ('paid', 'successful') else 'cems-badge-neutral' }}">{{ payment_display_status(r.payment_status) }}</span></td>
           <td>
             <div class="cems-table-actions">
+              {% if r.status == 'waitlisted' %}
+              <a href="{{ url_for('features.waitlist_status', event_id=r.event.id) }}" class="cems-btn cems-btn-outline cems-btn-sm">Waitlist #{{ waitlist_position(r) or '—' }}</a>
+              {% elif r.status in ('confirmed', 'approved', 'pending') %}
               <a href="{{ url_for('ticket', registration_id=r.id) }}" class="cems-btn cems-btn-outline cems-btn-sm">Ticket</a>
               <a href="{{ url_for('ticket_download', registration_id=r.id) }}" class="cems-btn cems-btn-primary cems-btn-sm">Download</a>
+              {% if r.event.is_team_event %}<a href="{{ url_for('features.team_page', event_id=r.event.id) }}" class="cems-btn cems-btn-outline cems-btn-sm">Team</a>{% endif %}
+              {% if r.payment_status == 'pending' and r.event.fee %}<a href="{{ url_for('demo_payment', event_id=r.event.id) }}" class="cems-btn cems-btn-warning cems-btn-sm">Pay now</a>{% endif %}
+              {% endif %}
+              {% if r.status in ('confirmed', 'approved', 'pending', 'waitlisted') and r.event.date and r.event.date >= now().date() %}
+              <form method="post" action="{{ url_for('features.student_cancel_registration', registration_id=r.id) }}" class="xm-inline" data-confirm="{{ 'Leave the waitlist?' if r.status == 'waitlisted' else 'Cancel this registration? Your seat will be released.' }}">
+                <button type="submit" class="cems-btn cems-btn-danger cems-btn-sm">{{ 'Leave waitlist' if r.status == 'waitlisted' else 'Cancel' }}</button>
+              </form>
+              {% endif %}
               {% if r.attended and not existing %}
               <a href="{{ url_for('feedback', registration_id=r.id) }}" class="cems-btn cems-btn-secondary cems-btn-sm">Feedback</a>
               {% elif existing %}

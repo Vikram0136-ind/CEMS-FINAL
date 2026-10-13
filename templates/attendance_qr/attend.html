@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Mark Attendance — CEMS{% endblock %}
+{% block breadcrumb %}Attendance{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/qr-attendance.css') }}">{% endblock %}
+
+{% block content %}
+<div class="qa-attend">
+  <div class="cems-card qa-attend-card qa-state-{{ state }}">
+    <div class="qa-attend-icon">{{ {'ready':'📋','success':'✅','duplicate':'ℹ️','expired':'⌛','closed':'🔒','unauthorized':'🚫','invalid':'❓'}[state] }}</div>
+    <h1>{{ title }}</h1>
+    {% if event %}
+    <div class="qa-event">
+      <strong>{{ event.title }}</strong>
+      <span>{{ event.date.strftime('%A, %d %b %Y') if event.date }} · {{ event.start_time }}–{{ event.end_time }}</span>
+      <span>{{ event.venue }}</span>
+    </div>
+    {% endif %}
+    {% if state == 'ready' %}
+    <p>You are signed in as <strong>{{ current_user.name }}</strong>. Confirm to mark yourself present.</p>
+    <form method="post" action="{{ url_for('qrattend.attend', token=s.token) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="cems-btn cems-btn-primary qa-confirm">Confirm my attendance</button>
+    </form>
+    <p class="xm-muted xm-small">This session closes in about {{ (seconds_left // 60) + 1 }} minute(s).</p>
+    {% else %}
+    <p>{{ message }}</p>
+    <a class="cems-btn cems-btn-outline" href="{{ url_for('dashboard') }}">Go to dashboard</a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

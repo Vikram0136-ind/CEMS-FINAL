@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ q.title }} — Community{% endblock %}
+{% block breadcrumb %}Community Q&A{% endblock %}
+
+{% block content %}
+<a class="cems-btn cems-btn-ghost cems-btn-sm" href="{{ url_for('features.community') }}">← All questions</a>
+<div class="cems-card" style="margin-top:12px"><div class="cems-card-body">
+  <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <h1 class="cems-page-title" style="margin:0">{{ q.title }}</h1>
+    <span class="cems-badge {{ 'cems-badge-success' if q.is_resolved else 'cems-badge-warning' }}">{{ 'Solved' if q.is_resolved else 'Open' }}</span></div>
+  <div class="xm-small xm-muted" style="margin:6px 0 14px">Asked by {{ q.author.name }} ({{ q.author.role|title }}) · {{ q.created_at.strftime('%d %b %Y %H:%M') }}{% if q.event %} · <a href="{{ url_for('event_details', event_id=q.event.id) }}">{{ q.event.title }}</a>{% endif %}</div>
+  {% if q.body %}<div class="xm-pre">{{ q.body }}</div>{% endif %}
+  {% if q.user_id == current_user.id or current_role == 'admin' %}
+  <form method="post" action="{{ url_for('features.community_delete', question_id=q.id) }}" data-confirm="Delete this question and all its answers?" style="margin-top:14px"><button class="cems-btn cems-btn-sm cems-btn-outline" type="submit">Delete question</button></form>{% endif %}
+</div></div>
+
+<h2 style="margin:24px 0 12px;font-size:1.1rem">{{ q.answers|length }} answer{{ '' if q.answers|length == 1 else 's' }}</h2>
+{% for a in q.answers %}
+<div class="xm-answer {{ 'accepted' if a.is_accepted }}">
+  <div class="xm-pre">{{ a.body }}</div>
+  <div class="xm-small xm-muted" style="margin-top:8px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+    <span>{{ a.author.name }} · <span class="cems-badge cems-badge-neutral">{{ a.author.role|title }}</span> · {{ a.created_at.strftime('%d %b %Y %H:%M') }}{% if a.is_accepted %} · <strong style="color:var(--cems-success)">✓ Accepted answer</strong>{% endif %}</span>
+    <span class="xm-actions">
+      {% if q.user_id == current_user.id or current_role == 'admin' %}<form method="post" action="{{ url_for('features.community_accept', question_id=q.id, answer_id=a.id) }}" class="xm-inline"><button class="cems-btn cems-btn-sm cems-btn-outline" type="submit">{{ 'Un-accept' if a.is_accepted else 'Mark as solution' }}</button></form>{% endif %}
+      {% if a.user_id == current_user.id or current_role == 'admin' %}<form method="post" action="{{ url_for('features.community_answer_delete', answer_id=a.id) }}" class="xm-inline" data-confirm="Delete this answer?"><button class="cems-btn cems-btn-sm cems-btn-ghost" type="submit">Delete</button></form>{% endif %}
+    </span></div>
+</div>
+{% endfor %}
+
+<div class="cems-card" style="margin-top:20px"><div class="cems-card-header"><div class="cems-card-title">Your answer</div></div>
+  <form method="post" action="{{ url_for('features.community_answer', question_id=q.id) }}" class="cems-card-body">
+    <div class="cems-form-group"><textarea name="body" class="cems-form-input" rows="4" required maxlength="3000" aria-label="Your answer" placeholder="Share what you know…"></textarea></div>
+    <button class="cems-btn cems-btn-primary" type="submit">Post answer</button>
+  </form></div>
+{% endblock %}

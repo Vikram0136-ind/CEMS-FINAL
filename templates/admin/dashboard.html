@@ -10,7 +10,10 @@
       <h1 class="cems-page-title">Welcome back, {{ current_user.name }}!</h1>
       <p class="cems-page-description">Approvals, attendance, venues and campus activity at a glance.</p>
     </div>
-    <div class="cems-page-actions"><a href="{{ url_for('admin_events') }}" class="cems-btn cems-btn-primary">Review Events</a></div>
+    <div class="cems-page-actions xm-actions">
+      <form method="post" action="{{ url_for('features.run_reminders') }}" class="xm-inline" title="Send event, deadline and waitlist reminders now"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" class="cems-btn cems-btn-outline">Send reminders now</button></form>
+      <a href="{{ url_for('admin_events') }}" class="cems-btn cems-btn-primary">Review Events</a>
+    </div>
   </div>
 </div>
 

@@ -233,6 +233,9 @@
         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:4px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 20V10m6 10V4m6 16v-7m4 7H2"/></svg>
         Reports
       </a>
+      <a href="{{ url_for('features.entry_exit', event_id=event.id) }}" class="cems-btn cems-btn-secondary">Entry / Exit</a>
+      <a href="{{ url_for('features.competition', event_id=event.id) }}" class="cems-btn cems-btn-secondary">Rounds &amp; Winners</a>
+      <a href="{{ url_for('features.attendance_history', event_id=event.id) }}" class="cems-btn cems-btn-secondary">Attendance History</a>
       {% if event.status == 'completed' %}
       <a href="{{ url_for('faculty_event_summary', event_id=event.id) }}" class="cems-btn cems-btn-info">
         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:4px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>

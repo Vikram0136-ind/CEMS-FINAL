@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% from 'features/_macros.html' import rate_bar %}
+{% block title %}Attendance History — CEMS{% endblock %}
+{% block breadcrumb %}Attendance History{% endblock %}
+
+{% block content %}
+<div class="cems-page-header">
+  <div class="cems-page-header-top">
+    <div><h1 class="cems-page-title">Faculty Attendance History</h1>
+      <p class="cems-page-description">{% if faculty %}Every attendance mark and entry/exit for events coordinated by {{ faculty.name }}.{% else %}No faculty selected.{% endif %}</p></div>
+    {% if faculty %}<div class="cems-page-actions"><a class="cems-btn cems-btn-outline" href="{{ url_for('features.attendance_history', **dict(request.args.to_dict(), export='csv')) }}">Export CSV</a></div>{% endif %}
+  </div>
+</div>
+
+{% if faculty_list %}
+<form method="get" class="xm-filter-bar"><div class="cems-form-group"><label for="f-fac">Faculty</label>
+  <select id="f-fac" name="faculty_id" class="cems-form-select" onchange="this.form.submit()">
+  {% for u in faculty_list %}<option value="{{ u.id }}" {% if faculty and faculty.id == u.id %}selected{% endif %}>{{ u.name }}</option>{% endfor %}</select></div></form>
+{% endif %}
+
+{% if faculty %}
+<div class="cems-card xm-section">
+  <div class="cems-card-header"><div class="cems-card-title">Summary by event</div></div>
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>Event</th><th>Date</th><th>Registered</th><th>Present</th><th>Late</th><th>Absent</th><th>Not marked</th><th>Attendance rate</th><th>Marks by this faculty</th><th>Last marked</th></tr></thead><tbody>
+    {% for row in summary %}
+      <tr><td><a href="{{ url_for('features.attendance_history', event_id=row.event.id, faculty_id=faculty.id) }}">{{ row.event.title }}</a></td><td>{{ row.event.date.strftime('%d %b %Y') }}</td>
+        <td>{{ row.registered }}</td><td>{{ row.counts.present }}</td><td>{{ row.counts.late }}</td><td>{{ row.counts.absent }}</td><td>{{ row.unmarked }}</td><td>{{ rate_bar(row.rate) }}</td>
+        <td>{{ row.mine }}</td><td>{{ row.last.strftime('%d %b %Y %H:%M') if row.last else '—' }}</td></tr>
+    {% else %}<tr><td colspan="10" class="xm-muted" style="text-align:center;padding:24px">No assigned events.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+
+<form method="get" class="cems-card cems-card-body xm-filter-bar" style="padding:16px">
+  {% if request.args.get('faculty_id') %}<input type="hidden" name="faculty_id" value="{{ request.args.get('faculty_id') }}">{% endif %}
+  <div class="cems-form-group"><label for="f-ev">Event</label><select id="f-ev" name="event_id" class="cems-form-select"><option value="">All events</option>
+    {% for e in events %}<option value="{{ e.id }}" {% if filters.event_id == e.id %}selected{% endif %}>{{ e.title }}</option>{% endfor %}</select></div>
+  <div class="cems-form-group"><label for="f-act">Action</label><select id="f-act" name="action" class="cems-form-select"><option value="">All</option>
+    {% for a in ('present','late','absent','in','out') %}<option value="{{ a }}" {% if filters.action == a %}selected{% endif %}>{{ {'in':'Entry','out':'Exit'}.get(a, a|title) }}</option>{% endfor %}</select></div>
+  <div class="cems-form-group"><label for="f-from">From</label><input id="f-from" type="date" name="from" class="cems-form-input" value="{{ filters.date_from }}"></div>
+  <div class="cems-form-group"><label for="f-to">To</label><input id="f-to" type="date" name="to" class="cems-form-input" value="{{ filters.date_to }}"></div>
+  <button class="cems-btn cems-btn-primary" type="submit">Filter</button>
+</form>
+
+<div class="cems-card xm-section" style="margin-top:16px">
+  <div class="cems-card-header"><div class="cems-card-title">Activity log</div></div>
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>Time</th><th>Event</th><th>Student</th><th>Action</th><th>Method</th><th>Marked by</th></tr></thead><tbody>
+    {% for log in logs.items %}
+      <tr><td>{{ log.at.strftime('%d %b %Y %H:%M:%S') }}</td><td>{{ log.event.title }}</td><td>{{ log.registration.user.name }}<div class="xm-small xm-muted">{{ log.registration.user.roll_no or '' }}</div></td>
+        <td><span class="cems-badge {{ {'present':'cems-badge-success','late':'cems-badge-warning','absent':'cems-badge-danger','in':'cems-badge-info','out':'cems-badge-neutral'}.get(log.action) }}">{{ {'in':'Entry','out':'Exit'}.get(log.action, log.action|title) }}</span></td>
+        <td>{{ (log.method or '—')|replace('_',' ') }}</td><td>{{ log.actor.name if log.actor else '—' }}</td></tr>
+    {% else %}<tr><td colspan="6" class="xm-muted" style="text-align:center;padding:28px">No attendance activity recorded yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+  {% if logs.pages > 1 %}
+  <div class="cems-pagination" style="padding:12px">
+    {% if logs.has_prev %}<a class="cems-pagination-btn" href="{{ url_for('features.attendance_history', **dict(request.args.to_dict(), page=logs.prev_num)) }}">← Previous</a>{% endif %}
+    <span class="cems-pagination-info">Page {{ logs.page }} of {{ logs.pages }}</span>
+    {% if logs.has_next %}<a class="cems-pagination-btn" href="{{ url_for('features.attendance_history', **dict(request.args.to_dict(), page=logs.next_num)) }}">Next →</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

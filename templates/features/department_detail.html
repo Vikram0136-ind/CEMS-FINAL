@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from 'features/_macros.html' import rate_bar, stat %}
+{% block title %}{{ dept }} — Department — CEMS{% endblock %}
+{% block breadcrumb %}Department Dashboard · {{ dept }}{% endblock %}
+
+{% block content %}
+<div class="cems-page-header">
+  <div class="cems-page-header-top">
+    <div>
+      <a class="cems-btn cems-btn-ghost cems-btn-sm" href="{{ url_for('features.department_dashboard') }}">← All departments</a>
+      <h1 class="cems-page-title">{{ dept }}</h1>
+      <p class="cems-page-description">Which events this department took part in, and how its students performed.</p>
+    </div>
+  </div>
+</div>
+<div class="cems-stats-grid">
+  {{ stat('Students', student_rows|length) }}
+  {{ stat('Registrations', stats.registered) }}
+  {{ stat('Attended', stats.attended) }}
+  {{ stat('Attendance rate', stats.rate ~ '%', hint='Registered : Attended = ' ~ stats.ratio) }}
+  {{ stat('Achievement points', total_points) }}
+</div>
+
+<div class="cems-card xm-section">
+  <div class="cems-card-header"><div class="cems-card-title">Events joined by this department</div></div>
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>Event</th><th>Date</th><th>Registered</th><th>Attended</th><th>Attendance rate</th></tr></thead>
+    <tbody>
+    {% for row in event_rows %}
+      <tr><td><a href="{{ url_for('event_details', event_id=row.event.id) }}">{{ row.event.title }}</a></td><td>{{ row.event.date.strftime('%d %b %Y') }}</td><td>{{ row.stats.registered }}</td><td>{{ row.stats.attended }}</td><td>{{ rate_bar(row.stats.rate) }}</td></tr>
+    {% else %}<tr><td colspan="5" class="xm-muted" style="text-align:center;padding:24px">No registrations yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+
+<div class="cems-card xm-section">
+  <div class="cems-card-header"><div class="cems-card-title">Students</div></div>
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>Student</th><th>Roll no</th><th>Batch</th><th>Semester</th><th>Events</th><th>Attended</th><th>Points</th></tr></thead>
+    <tbody>
+    {% for row in student_rows %}
+      <tr><td>{{ row.user.name }}</td><td>{{ row.profile.roll_no if row.profile else row.user.roll_no or '—' }}</td><td>{{ row.profile.batch if row.profile and row.profile.batch else '—' }}</td>
+        <td>{% if row.profile and row.profile.semester %}{{ row.profile.semester }} <span class="xm-small xm-muted">({{ semester_parity(row.profile.semester) or '—' }})</span>{% else %}—{% endif %}</td>
+        <td>{{ row.events }}</td><td>{{ row.attended }}</td><td><strong>{{ row.points }}</strong></td></tr>
+    {% else %}<tr><td colspan="7" class="xm-muted" style="text-align:center;padding:24px">No students.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+{% endblock %}

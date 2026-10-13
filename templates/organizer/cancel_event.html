@@ -7,7 +7,7 @@
   <div class="cems-page-header-top">
     <div>
       <h1 class="cems-page-title">Cancel Event</h1>
-      <p class="cems-page-description">Request cancellation for <strong>{{ event.title }}</strong>.</p>
+      <p class="cems-page-description">Cancel <strong>{{ event.title }}</strong>.</p>
     </div>
     <div class="cems-page-actions">
       <a href="{{ url_for('manage_event', event_id=event.id) }}" class="cems-btn cems-btn-secondary">Back to Event</a>
@@ -23,9 +23,9 @@
     <div class="cems-alert cems-alert-warning" style="margin-bottom: 20px;">
       <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.983 0a10 10 0 100 20 10 10 0 000-20zM9 8h6a1 1 0 110 2H9a1 1 0 010-2zm0 4h6a1 1 0 110 2H9a1 1 0 110-2z"></path></svg>
       <div style="margin-left: 12px;">
-        <strong>Important:</strong> This action sends a cancellation request to an administrator for approval.
-        The event and all historical records will be preserved. Registered students
-        will be notified once the cancellation is approved. New registrations will be blocked.
+        <strong>Important:</strong> The event is cancelled immediately and all historical records are preserved.
+        Every registered and waitlisted student, coordinating faculty, administrators and everyone who saved the event
+        are notified right away with your reason. Paid registrations are marked for refund and new registrations are blocked.
       </div>
     </div>
 

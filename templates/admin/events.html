@@ -80,6 +80,14 @@
               {% else %}
               <a href="{{ url_for('event_details', event_id=e.id) }}" class="cems-btn cems-btn-secondary cems-btn-sm">View</a>
               {% endif %}
+              {% if e.status == 'approved' %}
+              <a href="{{ url_for('features.competition', event_id=e.id) }}" class="cems-btn cems-btn-outline cems-btn-sm">Winners</a>
+              <form method="post" action="{{ url_for('features.admin_cancel_event', event_id=e.id) }}" style="display:inline" data-confirm="Cancel this event and notify everyone registered?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="text" name="reason" placeholder="Reason" required maxlength="500" style="width:110px;font-size:.8rem;padding:4px">
+                <button type="submit" class="cems-btn cems-btn-danger cems-btn-sm">Cancel</button>
+              </form>
+              {% endif %}
             </div>
           </td>
         </tr>

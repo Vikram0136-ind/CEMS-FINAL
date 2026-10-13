@@ -15,7 +15,6 @@ from dotenv import load_dotenv
 from flask import Flask, render_template, redirect, url_for, request, flash, send_file, abort, jsonify, session
 from flask_wtf.csrf import generate_csrf
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from flask_sqlalchemy import SQLAlchemy
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
@@ -24,7 +23,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from markupsafe import Markup, escape
 
-from cems.extensions import csrf, limiter, migrate
+from cems import features
+from cems.extensions import csrf, db, limiter, migrate
 
 load_dotenv()
 
@@ -303,6 +303,10 @@ db_url = os.getenv("DATABASE_URL", "sqlite:///cems.db")
 app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=12)
+app.config["REMEMBER_COOKIE_DURATION"] = timedelta(days=7)
+if IS_PRODUCTION and _env_flag("FLASK_DEBUG", False):
+    raise RuntimeError("FLASK_DEBUG must be disabled in production.")
 
 app.jinja_env.globals["event_banner_url"] = event_banner_url
 app.jinja_env.globals["event_image_url"] = event_image_url
@@ -369,7 +373,7 @@ def nl2br(value):
 
 csrf.init_app(app)
 limiter.init_app(app)
-db = SQLAlchemy(app)
+db.init_app(app)
 migrate.init_app(app, db)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
@@ -593,6 +597,9 @@ class Event(db.Model):
     proposed_capacity = db.Column(db.Integer)
     reschedule_reason = db.Column(db.Text)
     original_data = db.Column(db.Text)
+    is_team_event = db.Column(db.Boolean, default=False)
+    min_team_size = db.Column(db.Integer, default=1)
+    max_team_size = db.Column(db.Integer, default=4)
     organizer = db.relationship("User", foreign_keys=[organizer_id], backref="organized_events")
 
 class EventActivity(db.Model):
@@ -645,6 +652,7 @@ class AttendanceRecord(db.Model):
     method = db.Column(db.String(30), default="manual")
     recorded_at = db.Column(db.DateTime, default=utcnow)
     check_in_time = db.Column(db.DateTime)
+    check_out_time = db.Column(db.DateTime)
 
 class DigitalCertificate(db.Model):
     __tablename__ = "digital_certificate"
@@ -663,6 +671,7 @@ class Registration(db.Model):
     payment_status = db.Column(db.String(30), default="free")
     attended = db.Column(db.Boolean, default=False)
     checkin_time = db.Column(db.DateTime)
+    check_out_time = db.Column(db.DateTime)
     registered_at = db.Column(db.DateTime, default=utcnow)
     user = db.relationship("User", backref="registrations")
     event = db.relationship("Event", backref="registrations")
@@ -784,7 +793,10 @@ class VolunteerAssignment(db.Model):
 
 @login_manager.user_loader
 def load_user(user_id):
-    return db.session.get(User, int(user_id))
+    user = db.session.get(User, int(user_id))
+    if user is not None and not user.is_active_account:
+        return None  # a blocked/suspended account is signed out on its next request
+    return user
 
 @app.context_processor
 def inject_globals():
@@ -899,6 +911,7 @@ def seed_data():
         return
     db.create_all()
     _add_missing_columns()
+    features.bootstrap()
     _seeded = True
     if not SEED_DEMO_DATA:
         return
@@ -1129,6 +1142,20 @@ NOTICE_CATEGORIES = [
 ]
 
 
+def _is_real_image(upload):
+    """Check the file's actual content (not just its extension) is a JPEG, PNG or WEBP image."""
+    from PIL import Image
+    try:
+        upload.stream.seek(0)
+        with Image.open(upload.stream) as img:
+            img.verify()
+            return img.format in {"JPEG", "PNG", "WEBP"}
+    except Exception:
+        return False
+    finally:
+        upload.stream.seek(0)
+
+
 def _prepare_image_upload(field, folder, max_bytes=2 * 1024 * 1024, label="Image"):
     upload = request.files.get(field)
     if not upload or not upload.filename:
@@ -1141,6 +1168,8 @@ def _prepare_image_upload(field, folder, max_bytes=2 * 1024 * 1024, label="Image
     upload.stream.seek(0)
     if size > max_bytes:
         return None, None, f"{label} must be {max_bytes // (1024 * 1024)} MB or smaller."
+    if not _is_real_image(upload):
+        return None, None, "That file is not a valid JPG, PNG, or WEBP image."
     return upload, f"/static/uploads/{folder}/{uuid4().hex}{extension}", None
 
 
@@ -1244,7 +1273,7 @@ def faculty_notice_delete(notice_id):
     db.session.delete(notice)
     db.session.commit()
     flash("Notice deleted.", "success")
-    return redirect(request.form.get("next") or url_for("faculty_notices"))
+    return redirect(_safe_next_url(request.form.get("next")) or url_for("faculty_notices"))
 
 
 @app.route("/admin/notices", methods=["GET", "POST"])
@@ -1302,6 +1331,8 @@ def _prepare_profile_photo():
     upload.stream.seek(0)
     if size > 2 * 1024 * 1024:
         return None, None, "Profile photos must be 2 MB or smaller."
+    if not _is_real_image(upload):
+        return None, None, "That file is not a valid JPG, PNG, or WEBP image."
 
     relative_path = f"uploads/profiles/{uuid4().hex}{extension}"
     return upload, relative_path, None
@@ -1337,6 +1368,8 @@ def _prepare_event_banner():
     upload.stream.seek(0)
     if size > 4 * 1024 * 1024:
         return None, None, "Event banners must be 4 MB or smaller."
+    if not _is_real_image(upload):
+        return None, None, "That file is not a valid JPG, PNG, or WEBP image."
     return upload, f"/static/uploads/events/{uuid4().hex}{extension}", None
 
 
@@ -1419,7 +1452,6 @@ def _validate_registration_step(role, step, payload):
             course = (payload.get("course") or "").strip()
             semester = (payload.get("semester") or "").strip()
             academic_session = (payload.get("academic_session") or "").strip()
-            batch = (payload.get("batch") or "").strip()
             if not course:
                 errors["course"] = "Course is required."
             if not semester:
@@ -1469,11 +1501,16 @@ def api_register_save_step():
     role = (payload.get("role") or "").strip().lower()
     if not role:
         return jsonify({"success": False, "errors": {"role": "Role is required."}}), 400
+    if role not in {"student", "organizer", "faculty"}:
+        return jsonify({"success": False, "errors": {"role": "Invalid role."}}), 400
     session_data = session.get("registration_data", {})
     session_data.setdefault(role, {})
     for key, value in payload.items():
-        if key != "role":
-            session_data[role][key] = value
+        # Session cookies are signed, not encrypted: never store credentials in them.
+        if key == "role" or "password" in str(key).lower() or not isinstance(value, (str, int, float, bool)):
+            continue
+        if len(session_data[role]) < 40:
+            session_data[role][str(key)[:40]] = str(value)[:200]
     session["registration_data"] = session_data
     return jsonify({"success": True, "data": session_data.get(role, {})}), 200
 
@@ -1527,6 +1564,10 @@ def student_register_page():
         student_id = (payload.get("student_id") or "").strip()
         if StudentAccountProfile.query.filter_by(student_id=student_id).first():
             return jsonify({"success": False, "errors": {"student_id": "This student ID is already registered."}}), 400
+        duplicate = features.duplicate_roll_account(None, student_id, (payload.get("roll_no") or "").strip())
+        if duplicate is not None:
+            field = "student_id" if features.norm_id(duplicate.student_id) == features.norm_id(student_id) else "roll_no"
+            return jsonify({"success": False, "errors": {field: "This ID is already registered to another account (duplicate ID detected)."}}), 400
         upload, profile_image, photo_error = _prepare_profile_photo()
         if photo_error:
             return jsonify({"success": False, "errors": {"profile_photo": photo_error}}), 400
@@ -1787,7 +1828,6 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    role = normalize_role(current_user.role)
     return redirect(url_for(get_role_dashboard_route(current_user.role)))
 
 
@@ -1968,6 +2008,10 @@ def _save_faculty_attendance(registration, status, method="faculty_manual"):
     attendance.check_in_time = now if status in ("present", "late") else None
     registration.attended = status in ("present", "late")
     registration.checkin_time = attendance.check_in_time
+    if status in ("present", "late"):
+        attendance.check_out_time = None
+        registration.check_out_time = None
+    features.on_attendance_marked(registration, status, method, current_user if current_user.is_authenticated else None)
     return attendance
 
 
@@ -2051,25 +2095,43 @@ def events():
     q = request.args.get("q","").strip()
     category = request.args.get("category","").strip()
     status = request.args.get("status","").strip()
-    query = Event.query.filter_by(status="approved")
+    when = request.args.get("when", "").strip().lower()
+    when = when if when in ("all", "past", "present", "future") else ""
+    today = utcnow().date()
+    # "Actual" events are the ones that really ran or will run: approved or completed (never drafts/cancelled).
+    query = Event.query.filter(Event.status.in_(("approved", "completed")) if when else Event.status == "approved")
     if q:
         query = query.filter(Event.title.ilike(f"%{q}%"))
     if category:
         query = query.filter_by(category=category)
-    today = utcnow().date()
+    when_counts = {}
+    if when:
+        base = query
+        when_counts = {"all": base.count(), "past": base.filter(Event.date < today).count(),
+                       "present": base.filter(Event.date == today).count(), "future": base.filter(Event.date > today).count()}
+        if when == "past":
+            query = query.filter(Event.date < today)
+        elif when == "present":
+            query = query.filter(Event.date == today)
+        elif when == "future":
+            query = query.filter(Event.date > today)
     if status == "upcoming":
         query = query.filter(Event.date >= today)
     elif status == "completed":
         query = query.filter(Event.date < today)
-    event_list = query.order_by(Event.date.asc()).all()
+    event_list = query.order_by(Event.date.desc() if when == "past" else Event.date.asc()).all()
     categories = [r[0] for r in db.session.query(Event.category).distinct().all()]
     registration_status_map = {}
     if current_user.is_authenticated:
         registration_status_map = {
             reg.event_id: reg.status for reg in Registration.query.filter_by(user_id=current_user.id).all()
         }
+    if not when:
+        base = Event.query.filter(Event.status.in_(("approved", "completed")))
+        when_counts = {"all": base.count(), "past": base.filter(Event.date < today).count(),
+                       "present": base.filter(Event.date == today).count(), "future": base.filter(Event.date > today).count()}
     return render_template("events.html", events=event_list, categories=categories, q=q, category=category, status=status,
-                           registration_status_map=registration_status_map)
+                           when=when, when_counts=when_counts, registration_status_map=registration_status_map)
 
 
 @app.route("/past-events")
@@ -2108,6 +2170,7 @@ def past_event_detail(event_id):
         total=len(regs), present=present, absent=len(regs) - present,
         attendance_percentage=round(present * 100 / len(regs)) if regs else 0,
     )
+    summary.rate = features.pct(present, len(regs))
     return render_template("past_event_detail.html", event=event, summary=summary,
                            results_text=event.completion_notes, gallery=[], documents=[], past_record=None)
 
@@ -2152,8 +2215,22 @@ def event_details(event_id):
     else:
         reg_ctx.update(can_register=True, message="", reason="")
 
+    my_registration = None
+    if current_user.is_authenticated:
+        my_registration = Registration.query.filter(
+            Registration.user_id == current_user.id, Registration.event_id == event.id,
+            Registration.status.notin_(("cancelled", "rejected"))).first()
+    waitlisted = my_registration is not None and my_registration.status == "waitlisted"
+    if waitlisted:
+        registered = False
+    my_team = features.team_for_user(event, current_user) if (event.is_team_event and current_user.is_authenticated
+                                                             and normalize_role(current_user.role) == "student") else None
     return render_template("event_details.html", event=event, registered=registered, seats=seats, reg_ctx=reg_ctx,
-                           display_status=event_display_status(event))
+                           display_status=event_display_status(event), my_registration=my_registration,
+                           waitlisted=waitlisted, my_team=my_team,
+                           can_join_waitlist=(reg_ctx["message"] == "Event full" and current_user.is_authenticated
+                                              and normalize_role(current_user.role) == "student" and not waitlisted),
+                           waitlist_count=len(features.waitlist_queue(event)))
 
 def _seats_left(event):
     taken = Registration.query.filter(
@@ -2185,8 +2262,14 @@ def student_dashboard():
     attended = sum(1 for reg in user_regs if reg.attended)
     tickets = sum(1 for reg in user_regs if reg.status == "confirmed")
     student_profile = StudentAccountProfile.query.filter_by(user_id=current_user.id).first()
-    certificates_count = attended
+    certificates_count = attended + sum(1 for reg in user_regs if features.winner_for_registration(reg))
     uploaded_images_count = int(bool(student_profile and student_profile.profile_image))
+    my_points = sum(p.points for p in features.AchievementPoint.query.filter_by(user_id=current_user.id).all())
+    wishlist_count = features.WishlistItem.query.filter_by(user_id=current_user.id).count()
+    waitlisted_count = sum(1 for reg in user_regs if reg.status == "waitlisted")
+    attendance_rate = features.pct(attended, sum(1 for reg in user_regs if reg.status in features.ACTIVE))
+    deadline_soon = [e for e in upcoming if e.registration_deadline and e.registration_deadline >= today
+                     and (e.registration_deadline - today).days <= 3 and e.id not in registration_status_map]
 
     return render_template(
         "student/dashboard.html",
@@ -2205,6 +2288,11 @@ def student_dashboard():
         pending_feedbacks=pending_feedbacks,
         past_events=past_events,
         seats_left_map=seats_left_map,
+        my_points=my_points,
+        wishlist_count=wishlist_count,
+        waitlisted_count=waitlisted_count,
+        attendance_rate=attendance_rate,
+        deadline_soon=deadline_soon,
     )
 
 
@@ -2267,6 +2355,8 @@ def _registration_eligibility(event, user):
     def result(eligible, reason="", message="", status="info"):
         return {"eligible": eligible, "reason": reason, "message": message, "status": status}
 
+    if existing and existing.status == "waitlisted":
+        return result(False, "already_registered", "You are on the waitlist for this event.", "info"), existing
     if existing:
         return result(False, "already_registered", "You are already registered for this event.", "success"), existing
     if event.status != "approved":
@@ -2278,6 +2368,8 @@ def _registration_eligibility(event, user):
         return result(False, "deadline_passed", "The registration deadline has passed.", "warning"), None
     if _seats_left(event) <= 0:
         return result(False, "event_full", "All seats for this event are taken.", "warning"), None
+    if features.duplicate_conflict(event, user):
+        return result(False, "duplicate_id", "Another account with the same student / roll ID is already registered for this event.", "warning"), None
     return result(True), None
 
 
@@ -2286,12 +2378,25 @@ def _registration_eligibility(event, user):
 def register_event(event_id):
     event = Event.query.get_or_404(event_id)
     eligibility, existing = _registration_eligibility(event, current_user)
+    can_waitlist = (not eligibility["eligible"] and eligibility["reason"] == "event_full" and not event.is_team_event
+                    and not features.duplicate_conflict(event, current_user))
     if request.method == "POST":
+        if request.form.get("action") == "waitlist":
+            if not can_waitlist or not request.form.get("terms_accepted"):
+                flash("You can only join the waitlist of a full event after accepting the rules.", "danger")
+                return redirect(url_for("register_event", event_id=event.id))
+            features.join_waitlist(event, current_user)
+            db.session.commit()
+            flash("You are on the waitlist. You will be promoted automatically if a seat opens.", "success")
+            return redirect(url_for("features.waitlist_status", event_id=event.id))
         if not eligibility["eligible"]:
             flash(eligibility["message"], "danger" if existing is None else "info")
             if existing:
                 return redirect(url_for("ticket", registration_id=existing.id))
             return redirect(url_for("event_details", event_id=event.id))
+        if event.is_team_event:
+            flash("This is a team event. Create a team or join one with an invite code.", "info")
+            return redirect(url_for("register_event", event_id=event.id))
         if not request.form.get("terms_accepted"):
             flash("Please accept the event rules and cancellation policy to continue.", "danger")
             return redirect(url_for("register_event", event_id=event.id))
@@ -2308,7 +2413,10 @@ def register_event(event_id):
                             f"{current_user.name} registered for {event.title}.")
         flash("Registration successful. Your digital ticket is ready.", "success")
         return redirect(url_for("ticket", registration_id=reg.id))
-    return render_template("student/register_event.html", event=event, eligibility=eligibility, existing_registration=existing)
+    team = features.team_for_user(event, current_user) if event.is_team_event else None
+    return render_template("student/register_event.html", event=event, eligibility=eligibility, existing_registration=existing,
+                           can_waitlist=can_waitlist, team=team, team_min=features.team_limits(event)[0],
+                           team_max=features.team_limits(event)[1])
 
 @app.route("/student/registrations")
 @role_required("student")
@@ -2453,10 +2561,14 @@ def _ensure_account_profile(user):
 def profile():
     student_profile = _ensure_account_profile(current_user)
     if request.method == "POST":
+        new_roll = request.form.get("roll_no", "").strip()
+        if new_roll and features.duplicate_roll_account(current_user.id, "", new_roll):
+            flash("That roll number is already registered to another account (duplicate ID detected).", "danger")
+            return redirect(url_for("profile"))
         current_user.name = request.form.get("name", "").strip() or current_user.name
         current_user.mobile = request.form.get("mobile", "").strip()
         current_user.department = request.form.get("department", "").strip()
-        current_user.roll_no = request.form.get("roll_no", "").strip()
+        current_user.roll_no = new_roll
         student_profile.roll_no = current_user.roll_no
         student_profile.department = current_user.department
         student_profile.semester = request.form.get("semester", "").strip()
@@ -2537,9 +2649,19 @@ def student_resume_export():
 @app.route("/student/certificates")
 @role_required("student")
 def student_certificates():
-    registrations = Registration.query.filter_by(user_id=current_user.id, attended=True).order_by(Registration.registered_at.desc()).all()
-    certificates = [(_certificate_info(r), r, r.event) for r in registrations]
-    return render_template("student/certificates.html", registrations=registrations, certificates=certificates)
+    registrations = Registration.query.filter(
+        Registration.user_id == current_user.id, Registration.status.in_(("confirmed", "approved", "pending")),
+    ).order_by(Registration.registered_at.desc()).all()
+    certificates, listed = [], []
+    for r in registrations:
+        winner = features.winner_for_registration(r)
+        if winner is not None:
+            certificates.append((_certificate_info(r, "winner", winner), r, r.event))
+        if r.attended:
+            certificates.append((_certificate_info(r, "participation"), r, r.event))
+        if winner is not None or r.attended:
+            listed.append(r)
+    return render_template("student/certificates.html", registrations=listed, certificates=certificates)
 
 
 def _update_staff_profile(profile, redirect_endpoint):
@@ -2733,6 +2855,14 @@ def kiosk_checkin_api():
     registration = Registration.query.filter_by(ticket_code=identifier, event_id=event.id).first()
     if registration is None:
         return jsonify({"success": False, "status": "invalid", "message": "Ticket not found for this event."})
+    if payload.get("direction") == "out":
+        status, message = features.record_exit(registration, current_user, "kiosk")
+        if status == "ok":
+            db.session.commit()
+        return jsonify({"success": status == "ok", "status": "exit" if status == "ok" else "invalid", "message": message,
+                        "participant": registration.user.name if registration.user else "Unknown student",
+                        "ticket_code": registration.ticket_code,
+                        "checkin_time": registration.check_out_time.isoformat() if registration.check_out_time else None})
     if registration.attended:
         return jsonify({
             "success": True,
@@ -2771,11 +2901,11 @@ def organizer_cancel_event(event_id):
         abort(403)
     if request.method == "POST":
         reason = request.form.get("reason", "Cancelled by organizer").strip() or "Cancelled by organizer"
-        event.status = "cancelled"
-        event.change_status = "cancelled"
-        create_notification(current_user.id, "Event cancelled", f"{event.title} was marked as cancelled. Reason: {reason}")
-        db.session.commit()
-        flash("Event marked as cancelled.", "success")
+        notified = features.cancel_event(event, reason, current_user)
+        if notified is None:
+            flash("Only draft, pending or approved events can be cancelled.", "warning")
+        else:
+            flash(f"Event cancelled. {notified} registrants, coordinators and followers were notified.", "success")
         return redirect(url_for("organizer_dashboard"))
     return render_template("organizer/cancel_event.html", event=event)
 
@@ -2787,18 +2917,54 @@ def organizer_reschedule_event(event_id):
     if event.organizer_id != current_user.id:
         abort(403)
     if request.method == "POST":
-        new_date = request.form.get("date")
+        if event.status not in ("approved", "pending", "waiting", "draft"):
+            flash("Only draft, pending or approved events can be rescheduled.", "warning")
+            return redirect(url_for("organizer_dashboard"))
+
+        def field(*names):
+            for name in names:
+                if request.form.get(name, "").strip():
+                    return request.form.get(name).strip()
+            return ""
+
+        raw_date, raw_start, raw_end = field("proposed_date", "date"), field("proposed_start_time", "start_time"), field("proposed_end_time", "end_time")
+        new_date = _parse_date(raw_date) if raw_date else None
+        start = _normalize_time(raw_start) if raw_start else None
+        end = _normalize_time(raw_end) if raw_end else None
+        raw_capacity = field("proposed_capacity", "capacity")
+        capacity = int(raw_capacity) if raw_capacity.isdigit() else None
+        problems = []
+        if (raw_date and not new_date) or (raw_start and not start) or (raw_end and not end):
+            problems.append("Enter a valid date and times (for example 10:00 AM).")
+        if raw_capacity and (capacity is None or capacity < 1):
+            problems.append("Capacity must be a whole number of at least 1.")
+        elif capacity is not None and capacity < features.active_count(event):
+            problems.append(f"Capacity cannot be lower than the {features.active_count(event)} students already registered.")
+        if new_date and new_date < utcnow().date():
+            problems.append("The new date cannot be in the past.")
+        if problems:
+            flash(" ".join(problems), "danger")
+            return redirect(url_for("organizer_reschedule_event", event_id=event.id))
+        old_summary = f"{event.date.strftime('%d %b %Y') if event.date else 'TBA'}, {event.start_time} – {event.end_time} at {event.venue}"
         if new_date:
-            event.date = datetime.strptime(new_date, "%Y-%m-%d").date()
-        if request.form.get("start_time"):
-            event.start_time = request.form.get("start_time")
-        if request.form.get("end_time"):
-            event.end_time = request.form.get("end_time")
-        if request.form.get("venue"):
-            event.venue = request.form.get("venue")
+            event.date = new_date
+            if event.registration_deadline and event.registration_deadline > new_date:
+                event.registration_deadline = new_date
+        if start:
+            event.start_time = start
+        if end:
+            event.end_time = end
+        if field("proposed_venue", "venue"):
+            event.venue = field("proposed_venue", "venue")[:160]
+        if capacity is not None:
+            event.capacity = capacity
+        event.reschedule_reason = request.form.get("reason", "").strip()[:500] or None
         event.change_status = "rescheduled"
+        log_event_activity(event, "event_rescheduled", f"Rescheduled by {current_user.name}.", reason=event.reschedule_reason or old_summary)
+        notified = features.notify_event_rescheduled(event, current_user, old_summary)
         db.session.commit()
-        flash("Event reschedule updated.", "success")
+        features.promote_waitlist(event)
+        flash(f"Event rescheduled. {notified} people were notified.", "success")
         return redirect(url_for("organizer_dashboard"))
     return render_template("organizer/reschedule_event.html", event=event)
 
@@ -2821,11 +2987,17 @@ def generate_certificates(event_id):
     if event.organizer_id != current_user.id:
         abort(403)
     regs = Registration.query.filter_by(event_id=event.id, attended=True).all()
+    winners = 0
     for reg in regs:
         if reg.user and reg.user.role == "student":
-            create_notification(reg.user_id, "Certificate ready", f"Your certificate for {event.title} is ready.")
+            if features.winner_for_registration(reg):
+                winners += 1
+                create_notification(reg.user_id, "Winner certificate ready",
+                                    f"Your winner certificate and participation certificate for {event.title} are ready.")
+            else:
+                create_notification(reg.user_id, "Certificate ready", f"Your participation certificate for {event.title} is ready.")
     db.session.commit()
-    flash(f"Certificates prepared for {len(regs)} attendee(s).", "success")
+    flash(f"Certificates prepared for {len(regs)} attendee(s), including {winners} winner(s).", "success")
     return redirect(url_for("organizer_participants", event_id=event.id))
 
 
@@ -2869,6 +3041,8 @@ def _read_event_form(form, existing=None):
     category = form.get("category", "").strip()
     if not category:
         errors["category"] = "Choose a category."
+    elif not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 &/\-]{1,39}", category):
+        errors["category"] = "Category may only contain letters, numbers, spaces, & / and -."
     values["category"] = category
     values["event_type"] = "paid" if form.get("event_type") == "paid" else "free"
 
@@ -2921,9 +3095,23 @@ def _read_event_form(form, existing=None):
 
     start_reg = _parse_date(form.get("registration_start"))
     values["registration_start"] = start_reg
+
+    values["is_team_event"] = form.get("is_team_event") in ("1", "on", "true", "yes")
+    try:
+        min_team = int(form.get("min_team_size", "") or 1)
+        max_team = int(form.get("max_team_size", "") or 4)
+        if not (1 <= min_team <= max_team <= 50):
+            raise ValueError
+    except ValueError:
+        errors["max_team_size"] = "Team size must be whole numbers with 1 ≤ minimum ≤ maximum ≤ 50."
+        min_team, max_team = 1, 4
+    values["min_team_size"], values["max_team_size"] = min_team, max_team
     for key in ("description", "highlights", "rules", "eligibility", "contact_info", "main_guest", "chief_guest",
                 "target_department", "target_semester"):
         values[key] = form.get(key, "").strip() or None
+    if values["target_semester"] not in (None, "odd", "even") + tuple(SEMESTERS):
+        errors["target_semester"] = "Choose a semester from the list."
+        values["target_semester"] = None
     values["description"] = values["description"] or ""
     return values, errors
 
@@ -3022,6 +3210,7 @@ def manage_event(event_id):
             _store_event_banner(qr_upload, qr_path)
         log_event_activity(event, "event_updated", "Event details updated by organizer.")
         db.session.commit()
+        features.promote_waitlist(event)
         flash("Event updated.", "success")
         return redirect(url_for("manage_event", event_id=event.id))
     faculty_members = User.query.filter(User.role.in_(("faculty", "teacher"))).order_by(User.name).all()
@@ -3114,13 +3303,29 @@ def demo_payment(event_id):
         flash("Online payment is not available. Please contact the event organizer.", "warning")
         return redirect(url_for("event_details", event_id=event.id))
     eligibility, existing = _registration_eligibility(event, current_user)
-    if existing:
+    owing = existing if (existing is not None and existing.status in ("confirmed", "approved")
+                         and existing.payment_status == "pending" and (event.fee or 0) > 0) else None
+    if existing and owing is None:
+        if existing.status == "waitlisted":
+            return redirect(url_for("features.waitlist_status", event_id=event.id))
         return redirect(url_for("ticket", registration_id=existing.id))
-    if not eligibility["eligible"]:
+    if owing is None and not eligibility["eligible"]:
         flash(eligibility["message"], "danger")
         return redirect(url_for("event_details", event_id=event.id))
     if not event.fee or event.fee <= 0:
         return redirect(url_for("register_event", event_id=event.id))
+    if event.is_team_event and owing is None:
+        flash("Create or join a team first.", "info")
+        return redirect(url_for("register_event", event_id=event.id))
+    if owing is not None and request.method == "POST":
+        owing.payment_status = "paid"
+        db.session.commit()
+        create_notification(current_user.id, "Payment successful",
+                            f"Demo payment recorded for {event.title}. Ticket: {owing.ticket_code}")
+        create_notification(event.organizer_id, "Payment received",
+                            f"{current_user.name} paid for {event.title}.")
+        flash("Demo payment successful. Your seat is confirmed.", "success")
+        return redirect(url_for("ticket", registration_id=owing.id))
     if request.method == "POST":
         ticket = "AGC-" + secrets.token_hex(4).upper()
         reg = Registration(ticket_code=ticket, user_id=current_user.id, event_id=event.id,
@@ -3135,40 +3340,77 @@ def demo_payment(event_id):
         return redirect(url_for("ticket", registration_id=reg.id))
     return render_template("student/demo_payment.html", event=event)
 
-@app.route("/certificate/<int:registration_id>")
-@login_required
-def certificate(registration_id):
-    reg = Registration.query.get_or_404(registration_id)
+def _certificate_access(reg):
     if reg.user_id != current_user.id and not (
         current_user.role == "admin"
         or (normalize_role(current_user.role) == "organizer" and reg.event.organizer_id == current_user.id)
     ):
         abort(403)
-    if not reg.attended:
+
+
+def _certificate_kind(reg, requested=None):
+    """('winner', winner_row) / ('participation', None) / (None, None) for a registration."""
+    winner = features.winner_for_registration(reg)
+    if requested == "participation":
+        return ("participation", None) if reg.attended else (None, None)
+    if winner is not None:
+        return "winner", winner
+    return ("participation", None) if reg.attended else (None, None)
+
+
+@app.route("/certificate/<int:registration_id>")
+@login_required
+def certificate(registration_id):
+    reg = Registration.query.get_or_404(registration_id)
+    _certificate_access(reg)
+    kind, winner = _certificate_kind(reg, request.args.get("type"))
+    if kind is None:
         flash("Certificate is available after attendance is recorded.", "warning")
         return redirect(url_for("my_registrations"))
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     w, h = A4
     c.setTitle("CEMS Certificate")
+    c.setLineWidth(3)
+    c.rect(28, 28, w - 56, h - 56)
+    c.setLineWidth(1)
+    c.rect(36, 36, w - 72, h - 72)
     c.setFont("Helvetica-Bold", 26)
     c.drawCentredString(w/2, h-150, COLLEGE.upper())
-    c.setFont("Helvetica-Bold", 30)
-    c.drawCentredString(w/2, h-230, "CERTIFICATE OF PARTICIPATION")
-    c.setFont("Helvetica", 16)
-    c.drawCentredString(w/2, h-300, "This certificate is proudly presented to")
-    c.setFont("Helvetica-Bold", 24)
-    c.drawCentredString(w/2, h-350, reg.user.name)
-    c.setFont("Helvetica", 15)
-    c.drawCentredString(w/2, h-410, f"for participating in {reg.event.title}")
-    c.drawCentredString(w/2, h-440, f"held at {reg.event.venue} on {reg.event.date.strftime('%d %B %Y')}")
+    if kind == "winner":
+        c.setFont("Helvetica-Bold", 28)
+        c.drawCentredString(w/2, h-230, "CERTIFICATE OF ACHIEVEMENT")
+        c.setFont("Helvetica", 16)
+        c.drawCentredString(w/2, h-300, "This certificate is proudly presented to")
+        c.setFont("Helvetica-Bold", 24)
+        c.drawCentredString(w/2, h-350, reg.user.name)
+        team = winner.team
+        c.setFont("Helvetica", 15)
+        if team is not None:
+            c.drawCentredString(w/2, h-385, f"as a member of team \"{team.name}\"")
+        c.setFont("Helvetica-Bold", 20)
+        c.drawCentredString(w/2, h-430, f"for securing {winner.category.upper()}")
+        c.setFont("Helvetica", 15)
+        c.drawCentredString(w/2, h-465, f"in {reg.event.title}")
+        c.drawCentredString(w/2, h-495, f"held at {reg.event.venue} on {reg.event.date.strftime('%d %B %Y')}")
+    else:
+        c.setFont("Helvetica-Bold", 30)
+        c.drawCentredString(w/2, h-230, "CERTIFICATE OF PARTICIPATION")
+        c.setFont("Helvetica", 16)
+        c.drawCentredString(w/2, h-300, "This certificate is proudly presented to")
+        c.setFont("Helvetica-Bold", 24)
+        c.drawCentredString(w/2, h-350, reg.user.name)
+        c.setFont("Helvetica", 15)
+        c.drawCentredString(w/2, h-410, f"for participating in {reg.event.title}")
+        c.drawCentredString(w/2, h-440, f"held at {reg.event.venue} on {reg.event.date.strftime('%d %B %Y')}")
     c.line(100, 120, w-100, 120)
     c.setFont("Helvetica", 11)
     c.drawString(100, 95, "Campus Event Management System")
-    c.drawRightString(w-100, 95, reg.ticket_code)
+    c.drawRightString(w-100, 95, _certificate_code(reg, kind))
     c.save()
     buf.seek(0)
-    return send_file(buf, mimetype="application/pdf", as_attachment=True, download_name=f"certificate-{reg.ticket_code}.pdf")
+    suffix = "winner" if kind == "winner" else "participation"
+    return send_file(buf, mimetype="application/pdf", as_attachment=True, download_name=f"certificate-{suffix}-{reg.ticket_code}.pdf")
 
 def _month_labels(count=6):
     today = utcnow().date().replace(day=1)
@@ -3405,9 +3647,14 @@ def admin_venues():
     if request.method == "POST":
         name = request.form.get("name","").strip()
         location = request.form.get("location","").strip()
-        capacity = int(request.form.get("capacity",100))
-        if name:
-            db.session.add(Venue(name=name, location=location, capacity=capacity))
+        raw_capacity = request.form.get("capacity", "100").strip()
+        capacity = int(raw_capacity) if raw_capacity.isdigit() else None
+        if not name:
+            flash("Venue name is required.", "danger")
+        elif capacity is None or not 1 <= capacity <= 100000:
+            flash("Capacity must be a whole number between 1 and 100000.", "danger")
+        else:
+            db.session.add(Venue(name=name[:150], location=location[:200], capacity=capacity))
             db.session.commit()
             flash("Venue added.", "success")
     venues = Venue.query.order_by(Venue.name).all()
@@ -3475,11 +3722,72 @@ def health():
 
 @app.errorhandler(404)
 def not_found(error):
+    if _wants_json_response():
+        return jsonify({"success": False, "message": "Not found."}), 404
     return render_template("errors/404.html"), 404
 
 @app.errorhandler(403)
 def forbidden(error):
+    if _wants_json_response():
+        return jsonify({"success": False, "message": "You do not have permission to do that."}), 403
     return render_template("errors/403.html"), 403
+
+
+def _wants_json_response():
+    return request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.path.startswith("/api/")
+
+
+ERROR_PAGES = {
+    400: ("Bad request", "The request could not be processed. If a form expired, reload the page and try again."),
+    405: ("Method not allowed", "That action is not available for this page."),
+    413: ("File too large", "The upload exceeds the 4 MB limit."),
+    429: ("Too many requests", "You are doing that too quickly. Please wait a moment and try again."),
+}
+
+
+def _error_response(error, code):
+    title, message = ERROR_PAGES.get(code, ("Something went wrong", "Please try again."))
+    if _wants_json_response():
+        return jsonify({"success": False, "message": message, "error": message}), code
+    try:
+        return render_template("errors/generic.html", code=code, title=title, message=message), code
+    except Exception:  # never let the error page itself fail
+        return f"{code} {title}", code
+
+
+for _code in ERROR_PAGES:
+    app.register_error_handler(_code, lambda error, _c=_code: _error_response(error, _c))
+
+
+@app.errorhandler(500)
+def server_error(error):
+    db.session.rollback()
+    app.logger.exception("Unhandled server error", exc_info=getattr(error, "original_exception", error))
+    if _wants_json_response():
+        return jsonify({"success": False, "message": "Unexpected server error."}), 500
+    try:
+        return render_template("errors/500.html"), 500
+    except Exception:
+        return "500 Server error", 500
+
+
+@app.after_request
+def security_headers(response):
+    """Defence-in-depth headers; the CSP still allows the inline scripts/styles the templates rely on."""
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(self), microphone=(), geolocation=()")
+    response.headers.setdefault("Content-Security-Policy", (
+        "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; object-src 'none'; "
+        "base-uri 'self'; form-action 'self'; frame-ancestors 'none'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; connect-src 'self'"))
+    if IS_PRODUCTION:
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    if current_user.is_authenticated and request.endpoint != "static":
+        response.headers.setdefault("Cache-Control", "no-store")
+    return response
 
 # ---------------------------------------------------------------------------
 # Notifications API + page context
@@ -3629,17 +3937,20 @@ def api_verify_qr_payment(event_id, registration_id):
 # ---------------------------------------------------------------------------
 # Certificates
 # ---------------------------------------------------------------------------
-def _certificate_code(reg):
+def _certificate_code(reg, kind="participation"):
     year = reg.event.date.year if reg.event and reg.event.date else utcnow().year
-    return f"CEMS-{year}-{reg.ticket_code}"
+    return f"CEMS-{year}-{'W-' if kind == 'winner' else ''}{reg.ticket_code}"
 
 
-def _certificate_info(reg):
+def _certificate_info(reg, kind="participation", winner=None):
+    if kind == "winner" and winner is None:
+        winner = features.winner_for_registration(reg)
     return SimpleNamespace(
-        certificate_code=_certificate_code(reg),
-        achievement="Certificate of Participation",
+        certificate_code=_certificate_code(reg, kind),
+        kind=kind,
+        achievement=f"Winner Certificate — {winner.category}" if kind == "winner" and winner else "Certificate of Participation",
         issued_date=reg.checkin_time or reg.event.date,
-        verified=bool(reg.attended),
+        verified=bool(reg.attended) or (kind == "winner" and winner is not None),
         issuer=None,
     )
 
@@ -3650,20 +3961,32 @@ def certificate_preview(registration_id):
     reg = Registration.query.get_or_404(registration_id)
     if reg.user_id != current_user.id and current_user.role != "admin":
         abort(403)
-    return redirect(url_for("verify_certificate", code=_certificate_code(reg)))
+    kind, _ = _certificate_kind(reg, request.args.get("type"))
+    return redirect(url_for("verify_certificate", code=_certificate_code(reg, kind or "participation")))
+
+
+CERTIFICATE_CODE_RE = re.compile(r"^CEMS-(\d{4})-(W-)?(.+)$", re.IGNORECASE)
 
 
 @app.route("/verify-certificate")
 def verify_certificate():
-    code = request.args.get("code", "").strip()
+    code = request.args.get("code", "").strip()[:80]
     cert = reg = None
     if code:
-        ticket = code.rsplit("-", 1)[-1].upper() if code.upper().startswith("CEMS-") else code.upper()
-        reg = Registration.query.filter_by(ticket_code=ticket).first()
-        if reg and _certificate_code(reg).upper() == code.upper():
-            cert = _certificate_info(reg)
-        else:
-            reg = None
+        match = CERTIFICATE_CODE_RE.match(code)
+        if match:
+            kind = "winner" if match.group(2) else "participation"
+            reg = Registration.query.filter_by(ticket_code=match.group(3).upper()).first()
+            if reg and _certificate_code(reg, kind).upper() == code.upper():
+                winner = features.winner_for_registration(reg)
+                if kind == "winner" and winner is None:
+                    reg = None
+                elif kind == "participation" and not reg.attended:
+                    reg = None
+                else:
+                    cert = _certificate_info(reg, kind, winner)
+            else:
+                reg = None
     return render_template("verify_certificate.html", code=code, cert=cert, reg=reg, COLLEGE=COLLEGE)
 
 
@@ -3698,7 +4021,7 @@ def teacher_certificates():
 @app.route("/teacher/reports")
 @role_required("faculty", "teacher")
 def teacher_reports():
-    return redirect(url_for("teacher_attendance_export"))
+    return redirect(url_for("features.faculty_report"))
 
 
 def _completion_context(event):
@@ -4021,7 +4344,23 @@ def _rate_limit_auth_routes():
                 app.view_functions[rule.endpoint] = limited
 
 
+from cems import feature_routes  # noqa: E402  (needs the models above)
+
+feature_routes.init_app(
+    app, User=User, Event=Event, Registration=Registration, Notification=Notification, Feedback=Feedback,
+    StudentAccountProfile=StudentAccountProfile, EventFaculty=EventFaculty, AttendanceRecord=AttendanceRecord,
+    Venue=Venue, registration_eligibility=_registration_eligibility, csv_response=_csv_response,
+    log_event_activity=log_event_activity, save_attendance=_save_faculty_attendance, send_email=send_email,
+)
+
+from cems import qr_attendance  # noqa: E402
+
+qr_attendance.init_app(app, User=User, Event=Event, Registration=Registration, EventFaculty=EventFaculty,
+                       save_attendance=_save_faculty_attendance)
+
 _rate_limit_auth_routes()
+for _endpoint in ("api_validate_registration_step", "api_register_save_step", "api_register_restore_step"):
+    app.view_functions[_endpoint] = limiter.limit("60 per minute", methods=["POST"])(app.view_functions[_endpoint])
 
 with app.app_context():
     seed_data()

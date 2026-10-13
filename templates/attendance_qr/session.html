@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from 'macros/icons.html' import icon %}
+{% block title %}Attendance QR — {{ s.event.title }}{% endblock %}
+{% block breadcrumb %}Attendance QR{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/qr-attendance.css') }}">{% endblock %}
+
+{% block content %}
+<div class="cems-page-header">
+  <div class="cems-page-header-top">
+    <div>
+      <h1 class="cems-page-title">{{ s.event.title }}</h1>
+      <p class="cems-page-description">{{ s.event.date.strftime('%d %b %Y') if s.event.date }} · {{ s.event.venue }}</p>
+    </div>
+    <div class="cems-page-actions">
+      <a class="cems-btn cems-btn-outline" href="{{ url_for('qrattend.generate', event_id=s.event_id) }}">New session</a>
+      <a class="cems-btn cems-btn-outline" href="{{ url_for('teacher_attendance', event_id=s.event_id) }}">Full report</a>
+    </div>
+  </div>
+</div>
+
+<div class="qa-layout" id="qa-root" data-status-url="{{ url_for('qrattend.status', ref=s.ref) }}"
+     data-expires="{{ state.expires_at }}" data-status="{{ state.status }}" data-seconds="{{ state.seconds_left }}">
+  <div class="cems-card qa-qr-card">
+    <div class="qa-qr-wrap" id="qa-qr-wrap">
+      <img id="qa-qr" src="{{ url_for('qrattend.qr_image', ref=s.ref) }}" alt="Attendance QR code">
+      <div class="qa-qr-overlay" id="qa-overlay" hidden></div>
+    </div>
+    <div class="qa-timer" id="qa-timer">--:--</div>
+    <span class="qa-status {{ state.status }}" id="qa-status">{{ state.status|title }}</span>
+    <p class="xm-muted xm-small qa-url">{{ attend_url }}</p>
+    <form method="post" action="{{ url_for('qrattend.close', ref=s.ref) }}" id="qa-close-form" data-confirm="End this attendance session now? Students will no longer be able to mark attendance.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="cems-btn cems-btn-danger" id="qa-close-btn" {{ 'hidden' if state.status != 'active' }}>End session</button>
+    </form>
+  </div>
+
+  <div class="qa-side">
+    <div class="qa-counter">
+      <div class="qa-count" id="qa-count">{{ state.count }}</div>
+      <div class="xm-muted">present via this QR · <span id="qa-eligible">{{ state.eligible }}</span> registered</div>
+    </div>
+    <div class="cems-card">
+      <div class="cems-card-header">
+        <div class="cems-card-title">Checked in</div>
+        <input type="search" id="qa-filter" class="cems-form-input qa-filter" placeholder="Filter by name or roll no." aria-label="Filter">
+      </div>
+      <div class="cems-overflow-x-auto"><table class="cems-table">
+        <thead><tr><th>Student</th><th>Roll no.</th><th>Status</th><th>Check-in time</th></tr></thead>
+        <tbody id="qa-rows">
+        {% for r in rows %}
+          <tr><td>{{ r.name }}</td><td>{{ r.roll_no or '—' }}</td><td><span class="qa-status active">Present</span></td><td>{{ r.checked_in_label }}</td></tr>
+        {% else %}<tr><td colspan="4" class="xm-muted" style="text-align:center;padding:24px">No one has checked in yet.</td></tr>{% endfor %}
+        </tbody></table></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}<script src="{{ url_for('static', filename='js/qr-attendance.js') }}" defer></script>{% endblock %}

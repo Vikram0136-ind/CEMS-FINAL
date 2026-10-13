@@ -129,6 +129,10 @@
               {% endif %}
             </div>
           </div>
+          {% set team_enabled = request.form.get('is_team_event') == '1' %}
+          {% set team_min = request.form.get('min_team_size') or 1 %}
+          {% set team_max = request.form.get('max_team_size') or 4 %}
+          {% include 'partials/team_settings.html' %}
         </div>
 
         <!-- Section 3: Target Audience -->
@@ -157,6 +161,8 @@
               <label class="cems-form-label">Target Semester</label>
               <select name="target_semester" class="cems-form-select">
                 <option value="">All Semesters</option>
+                <option value="odd" {% if request.form.target_semester == 'odd' %}selected{% endif %}>Odd semesters (1, 3, 5, 7)</option>
+                <option value="even" {% if request.form.target_semester == 'even' %}selected{% endif %}>Even semesters (2, 4, 6, 8)</option>
                 <option value="1" {% if request.form.target_semester == '1' %}selected{% endif %}>1st Semester</option>
                 <option value="2" {% if request.form.target_semester == '2' %}selected{% endif %}>2nd Semester</option>
                 <option value="3" {% if request.form.target_semester == '3' %}selected{% endif %}>3rd Semester</option>

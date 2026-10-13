@@ -20,10 +20,12 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/cems-layout.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/cems-components.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/cems-app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ext-modules.css') }}">
   {% block extra_css %}{% endblock %}
   {% block extra_head %}{% endblock %}
   <script defer src="{{ url_for('static', filename='js/csrf.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/cems.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/ext-modules.js') }}"></script>
 </head>
 <body class="{% if app_shell %}cems-body-app{% else %}cems-body-public{% endif %}{% block body_class %}{% endblock %}">
 
@@ -55,6 +57,10 @@
         {{ nav_link('notices', 'Notice Board', 'board', ['notices', 'board_notice_detail']) }}
         {{ nav_link('past_events', 'Past Events', 'clock', ['past_events', 'past_event_detail']) }}
         {{ nav_link('student_notifications', 'Notifications', 'bell') }}
+        {{ nav_link('features.wishlist', 'Saved Events', 'board') }}
+        {{ nav_link('features.achievements', 'My Achievements', 'award') }}
+        {{ nav_link('features.leaderboard', 'Leaderboard', 'chart') }}
+        {{ nav_link('features.community', 'Community Q&A', 'users', ['features.community', 'features.community_detail']) }}
       </div>
       <div class="cems-sidebar-section">
         <div class="cems-sidebar-section-title">Account</div>
@@ -78,6 +84,16 @@
         {{ nav_link('festival_calendar', 'Festival Calendar', 'calendar') }}
       </div>
       <div class="cems-sidebar-section">
+        <div class="cems-sidebar-section-title">Insights</div>
+        {{ nav_link('features.department_dashboard', 'Department Dashboard', 'dashboard', ['features.department_dashboard', 'features.department_detail']) }}
+        {{ nav_link('features.date_report', 'Date-to-Date Report', 'chart') }}
+        {{ nav_link('features.faculty_report', 'Faculty Reports', 'building') }}
+        {{ nav_link('features.leaderboard', 'Leaderboard', 'award') }}
+        {{ nav_link('features.entry_exit_index', 'Entry / Exit', 'scan', ['features.entry_exit_index', 'features.entry_exit']) }}
+        {{ nav_link('features.duplicates', 'Duplicate IDs', 'clipboard') }}
+        {{ nav_link('features.community', 'Community Q&A', 'users', ['features.community', 'features.community_detail']) }}
+      </div>
+      <div class="cems-sidebar-section">
         <div class="cems-sidebar-section-title">Resources</div>
         <a class="cems-nav-item{% if ep == 'organizer_support' and request.view_args.module == 'volunteers' %} active{% endif %}" href="{{ url_for('organizer_support', module='volunteers') }}">{{ icon('users') }}<span>Volunteers</span></a>
         <a class="cems-nav-item{% if ep == 'organizer_support' and request.view_args.module == 'judges' %} active{% endif %}" href="{{ url_for('organizer_support', module='judges') }}">{{ icon('gavel') }}<span>Judges</span></a>
@@ -90,8 +106,20 @@
         <div class="cems-sidebar-section-title">Main</div>
         {{ nav_link('faculty_dashboard', 'Dashboard', 'dashboard', ['faculty_dashboard', 'teacher_dashboard']) }}
         {{ nav_link('faculty_assigned_events', 'Assigned Events', 'clipboard', ['faculty_assigned_events', 'teacher_assigned_events', 'teacher_event_details', 'faculty_complete_event', 'faculty_event_summary']) }}
+        {{ nav_link('qrattend.generate', 'Generate Attendance QR', 'scan', ['qrattend.generate', 'qrattend.view']) }}
         {{ nav_link('teacher_attendance', 'Attendance', 'check') }}
         {{ nav_link('faculty_completed_events', 'Completed Events', 'archive') }}
+        {{ nav_link('features.attendance_history', 'Attendance History', 'clock') }}
+        {{ nav_link('features.entry_exit_index', 'Entry / Exit', 'scan', ['features.entry_exit_index', 'features.entry_exit']) }}
+        {{ nav_link('features.judge_index', 'Judge Panel', 'gavel', ['features.judge_index', 'features.judge_scoring']) }}
+      </div>
+      <div class="cems-sidebar-section">
+        <div class="cems-sidebar-section-title">Insights</div>
+        {{ nav_link('features.department_dashboard', 'Department Dashboard', 'dashboard', ['features.department_dashboard', 'features.department_detail']) }}
+        {{ nav_link('features.date_report', 'Date-to-Date Report', 'chart') }}
+        {{ nav_link('features.faculty_report', 'My Event Reports', 'building') }}
+        {{ nav_link('features.leaderboard', 'Leaderboard', 'award') }}
+        {{ nav_link('features.community', 'Community Q&A', 'users', ['features.community', 'features.community_detail']) }}
       </div>
       <div class="cems-sidebar-section">
         <div class="cems-sidebar-section-title">Explore</div>
@@ -113,6 +141,7 @@
         {{ nav_link('admin_events', 'Events', 'calendar', ['admin_events', 'admin_manage_cancellation', 'admin_manage_reschedule']) }}
         {{ nav_link('admin_users', 'Users', 'users') }}
         {{ nav_link('admin_registrations', 'Registrations', 'clipboard') }}
+        {{ nav_link('qrattend.generate', 'Attendance QR', 'scan', ['qrattend.generate', 'qrattend.view']) }}
       </div>
       <div class="cems-sidebar-section">
         <div class="cems-sidebar-section-title">Manage</div>
@@ -120,6 +149,17 @@
         {{ nav_link('admin_reports', 'Reports', 'chart') }}
         {{ nav_link('admin_notifications', 'Send Notifications', 'bell') }}
         {{ nav_link('admin_notices', 'Notices', 'board', ['admin_notices', 'notices', 'board_notice_detail']) }}
+      </div>
+      <div class="cems-sidebar-section">
+        <div class="cems-sidebar-section-title">Insights</div>
+        {{ nav_link('features.department_dashboard', 'Department Dashboard', 'dashboard', ['features.department_dashboard', 'features.department_detail']) }}
+        {{ nav_link('features.date_report', 'Date-to-Date Report', 'chart') }}
+        {{ nav_link('features.faculty_report', 'Faculty Reports', 'building') }}
+        {{ nav_link('features.leaderboard', 'Leaderboard', 'award') }}
+        {{ nav_link('features.entry_exit_index', 'Entry / Exit', 'scan', ['features.entry_exit_index', 'features.entry_exit']) }}
+        {{ nav_link('features.attendance_history', 'Attendance History', 'clock') }}
+        {{ nav_link('features.duplicates', 'Duplicate IDs', 'clipboard') }}
+        {{ nav_link('features.community', 'Community Q&A', 'users', ['features.community', 'features.community_detail']) }}
       </div>
       {% endif %}
     </nav>
@@ -209,6 +249,20 @@
 {% endblock %}
 {% endif %}
 
+{% if app_shell and role in ('student', 'organizer', 'faculty', 'admin') and request.endpoint != 'features.assistant' %}
+<button type="button" class="xm-chat-toggle" id="xm-chat-toggle" aria-label="Open campus assistant" title="Campus assistant">💬</button>
+<div class="xm-chat" id="xm-chat" role="dialog" aria-label="Campus assistant"
+     data-endpoint="{{ url_for('features.assistant_chat') }}" data-community="{{ url_for('features.community') }}"
+     data-suggestions='{{ chat_suggestions(role)|tojson }}'>
+  <div class="xm-chat-head"><span>Campus Assistant</span><button type="button" aria-label="Close assistant">×</button></div>
+  <div class="xm-chat-body" aria-live="polite"></div>
+  <div class="xm-chat-suggest"></div>
+  <form class="xm-chat-form" autocomplete="off">
+    <input type="text" class="cems-form-input" maxlength="500" placeholder="Ask anything about campus events…" aria-label="Your question" required>
+    <button type="submit" class="cems-btn cems-btn-primary cems-btn-sm">Send</button>
+  </form>
+</div>
+{% endif %}
 {% block extra_js %}{% endblock %}
 </body>
 </html>

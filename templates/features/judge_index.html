@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Judge Panel — CEMS{% endblock %}
+{% block breadcrumb %}Judge Panel{% endblock %}
+
+{% block content %}
+<div class="cems-page-header"><div><h1 class="cems-page-title">Judge Panel</h1><p class="cems-page-description">Events you have been appointed to judge. Enter scores round by round.</p></div></div>
+<div class="cems-card"><div class="cems-overflow-x-auto"><table class="cems-table">
+  <thead><tr><th>Event</th><th>Date</th><th>Rounds</th><th>My scores</th><th></th></tr></thead><tbody>
+  {% for row in rows %}
+    <tr><td><strong>{{ row.event.title }}</strong><div class="xm-small xm-muted">{{ row.event.venue }}</div></td><td>{{ row.event.date.strftime('%d %b %Y') }}</td>
+      <td>{% for r in row.rounds %}<span class="xm-chip">{{ r.name }} · {{ r.status }}</span> {% else %}<span class="xm-muted">No rounds yet</span>{% endfor %}</td>
+      <td>{{ row.scored }}{% if row.expected %} / {{ row.expected }}{% endif %}</td>
+      <td><a class="cems-btn cems-btn-sm cems-btn-primary" href="{{ url_for('features.judge_scoring', event_id=row.event.id) }}">Enter scores</a></td></tr>
+  {% else %}<tr><td colspan="5" class="xm-muted" style="text-align:center;padding:28px">You have not been added to any judge panel yet.</td></tr>{% endfor %}
+  </tbody></table></div></div>
+{% endblock %}

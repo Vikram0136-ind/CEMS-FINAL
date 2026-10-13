@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Entry / Exit — {{ event.title }}{% endblock %}
+{% block breadcrumb %}Entry / Exit · {{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="cems-page-header">
+  <div class="cems-page-header-top">
+    <div><a class="cems-btn cems-btn-ghost cems-btn-sm" href="{{ url_for('features.entry_exit_index') }}">← All events</a>
+      <h1 class="cems-page-title">{{ event.title }}</h1>
+      <p class="cems-page-description">{{ event.date.strftime('%d %b %Y') }} · {{ event.venue }} — {{ inside }} inside now, {{ visited }} entered so far.</p></div>
+    <div class="cems-page-actions"><a class="cems-btn cems-btn-outline" href="{{ url_for('features.entry_exit', event_id=event.id, export='csv') }}">Export CSV</a></div>
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('features.entry_exit_scan', event_id=event.id) }}" class="cems-card cems-card-body xm-filter-bar" style="padding:16px">
+  <div class="cems-form-group" style="flex:2"><label for="tc">Ticket code (scan or type)</label><input id="tc" name="ticket_code" class="cems-form-input" autocomplete="off" autofocus required maxlength="30" placeholder="AGC-XXXXXXXX"></div>
+  <button class="cems-btn cems-btn-success" type="submit" name="direction" value="in">Record entry</button>
+  <button class="cems-btn cems-btn-outline" type="submit" name="direction" value="out">Record exit</button>
+</form>
+
+<div class="cems-card xm-section" style="margin-top:20px"><div class="cems-overflow-x-auto"><table class="cems-table">
+  <thead><tr><th>Participant</th><th>Ticket</th><th>Status</th><th>First entry</th><th>Last exit</th><th>Visits</th><th>Time inside</th><th></th></tr></thead><tbody>
+  {% for row in rows %}
+    <tr>
+      <td>{{ row.reg.user.name }}<div class="xm-small xm-muted">{{ row.reg.user.roll_no or '' }}</div></td>
+      <td class="xm-small">{{ row.reg.ticket_code }}</td>
+      <td>{% if row.state and row.state.inside %}<span class="cems-badge cems-badge-success">Inside</span>{% elif row.state %}<span class="cems-badge cems-badge-neutral">Left</span>{% else %}<span class="cems-badge cems-badge-warning">Not arrived</span>{% endif %}</td>
+      <td>{{ row.state.first_in.strftime('%H:%M:%S') if row.state and row.state.first_in else '—' }}</td>
+      <td>{{ row.state.last_out.strftime('%H:%M:%S') if row.state and row.state.last_out else '—' }}</td>
+      <td>{{ row.state.visits if row.state else 0 }}</td><td>{{ row.duration }}</td>
+      <td>{% if row.state and row.state.inside %}
+        <form method="post" action="{{ url_for('features.entry_exit_mark', event_id=event.id, registration_id=row.reg.id, direction='out') }}" class="xm-inline"><button class="cems-btn cems-btn-sm cems-btn-outline" type="submit">Exit</button></form>
+        {% else %}
+        <form method="post" action="{{ url_for('features.entry_exit_mark', event_id=event.id, registration_id=row.reg.id, direction='in') }}" class="xm-inline"><button class="cems-btn cems-btn-sm cems-btn-primary" type="submit">Enter</button></form>
+        {% endif %}</td>
+    </tr>
+  {% else %}<tr><td colspan="8" class="xm-muted" style="text-align:center;padding:28px">No confirmed registrations.</td></tr>{% endfor %}
+  </tbody></table></div></div>
+{% endblock %}

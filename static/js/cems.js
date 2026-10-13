@@ -10,6 +10,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
   if (sidebarToggle && appSidebar && sidebarScrim) {
     sidebarToggle.addEventListener('click', function() {
+      if (window.innerWidth > 1024) {
+        const collapsed = document.body.classList.toggle('sidebar-collapsed');
+        sidebarToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        return;
+      }
       const isOpen = appSidebar.classList.toggle('open');
       sidebarScrim.classList.toggle('active', isOpen);
       sidebarToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
@@ -48,21 +53,13 @@ document.addEventListener('DOMContentLoaded', function() {
   // Close sidebar on window resize (desktop)
   window.addEventListener('resize', () => {
     if (window.innerWidth > 1024 && appSidebar && sidebarScrim) {
+      document.body.style.overflow = '';
       appSidebar.classList.remove('open');
       sidebarScrim.classList.remove('active');
     }
   });
 
-  // Confirm delete actions
-  const deleteForms = document.querySelectorAll('[data-confirm]');
-  deleteForms.forEach(form => {
-    form.addEventListener('submit', (e) => {
-      const message = form.getAttribute('data-confirm') || 'Are you sure you want to proceed?';
-      if (!confirm(message)) {
-        e.preventDefault();
-      }
-    });
-  });
+  // data-confirm dialogs are handled once, globally, in ext-modules.js
 
   // Search box focus effect
   const searchBox = document.querySelector('.cems-search-box input');

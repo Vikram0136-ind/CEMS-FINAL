@@ -45,9 +45,9 @@
     <div class="cems-alert cems-alert-info" style="margin-bottom: 20px;">
       <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-.01M13 12h-.01M13 8h.01M12 22a10 10 0 100-20 10 10 0 000 20z"></path></svg>
       <div style="margin-left: 12px;">
-        <strong>Notice:</strong> This request will be sent to an administrator for approval.
-        The system automatically checks for venue, organizer, resource, and capacity conflicts.
-        Registered students will be notified once the reschedule is approved.
+        <strong>Notice:</strong> The new schedule is applied immediately.
+        The system checks for venue, organizer, resource, and capacity conflicts as you type, and every registered student,
+        coordinating faculty and follower of this event is notified of the change.
       </div>
     </div>
 
@@ -111,7 +111,7 @@
       <div style="display: flex; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--cems-border);">
         <button type="submit" class="cems-btn cems-btn-primary">
           <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-          Submit Reschedule Request
+          Reschedule Event
         </button>
         <a href="{{ url_for('manage_event', event_id=event.id) }}" class="cems-btn cems-btn-secondary">Cancel</a>
       </div>
@@ -121,6 +121,11 @@
 
 <script>
 (function() {
+  function esc(value) {
+    var d = document.createElement('div');
+    d.textContent = value == null ? '' : String(value);
+    return d.innerHTML;
+  }
   var form = document.getElementById('rescheduleForm');
   var fields = ['proposed_date', 'proposed_start_time', 'proposed_end_time', 'proposed_venue', 'proposed_capacity'];
 
@@ -149,7 +154,7 @@
           var err = document.createElement('div');
           err.id = 'conflictResults';
           err.className = 'cems-alert cems-alert-danger';
-          err.innerHTML = '<div style="margin-left: 12px;"><strong>Error:</strong> ' + data.message + '</div>';
+          err.innerHTML = '<div style="margin-left: 12px;"><strong>Error:</strong> ' + esc(data.message) + '</div>';
           form.parentNode.insertBefore(err, form.nextSibling);
           return;
         }
@@ -166,16 +171,16 @@
         html += renderCheck('Venue Conflict', checks.venue_conflict);
         if (checks.venue_conflict.conflicts && checks.venue_conflict.conflicts.length > 0) {
           checks.venue_conflict.conflicts.forEach(function(c) {
-            html += '<div class="conflict-item conflict-venue"><strong>' + c.title + '</strong> — ' +
-              (c.date || '') + ' ' + (c.start_time || '') + '–' + (c.end_time || '') + ' at ' + (c.venue || '') + '</div>';
+            html += '<div class="conflict-item conflict-venue"><strong>' + esc(c.title) + '</strong> — ' +
+              esc((c.date || '') + ' ' + (c.start_time || '') + '–' + (c.end_time || '') + ' at ' + (c.venue || '')) + '</div>';
           });
         }
 
         html += renderCheck('Organizer Conflict', checks.organizer_conflict);
         if (checks.organizer_conflict.conflicts && checks.organizer_conflict.conflicts.length > 0) {
           checks.organizer_conflict.conflicts.forEach(function(c) {
-            html += '<div class="conflict-item conflict-organizer"><strong>' + c.title + '</strong> — ' +
-              (c.date || '') + ' ' + (c.start_time || '') + '–' + (c.end_time || '') + ' at ' + (c.venue || '') + '</div>';
+            html += '<div class="conflict-item conflict-organizer"><strong>' + esc(c.title) + '</strong> — ' +
+              esc((c.date || '') + ' ' + (c.start_time || '') + '–' + (c.end_time || '') + ' at ' + (c.venue || '')) + '</div>';
           });
         }
 
@@ -199,7 +204,7 @@
         var box = document.createElement('div');
         box.id = 'conflictResults';
         box.className = 'cems-alert cems-alert-danger';
-        box.innerHTML = '<div style="margin-left: 12px;">Could not check conflicts: ' + err.message + '</div>';
+        box.innerHTML = '<div style="margin-left: 12px;">Could not check conflicts: ' + esc(err.message) + '</div>';
         form.parentNode.insertBefore(box, form.nextSibling);
       });
   }
@@ -208,7 +213,7 @@
     var passed = check.passed;
     var icon = passed ? '✅' : '❌';
     var colorClass = passed ? 'check-passed' : 'check-failed';
-    var msg = check.message ? '<br><small>' + check.message + '</small>' : '';
+    var msg = check.message ? '<br><small>' + esc(check.message) + '</small>' : '';
     return '<div style="padding: 8px 0; font-size: 13px; border-bottom: 1px solid var(--cems-border);">' +
       '<span class="conflict-indicator ' + colorClass + '">' + icon + ' ' + label + '</span>' + msg + '</div>';
   }

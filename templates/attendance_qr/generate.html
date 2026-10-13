@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from 'macros/icons.html' import icon %}
+{% block title %}Generate Attendance QR — CEMS{% endblock %}
+{% block breadcrumb %}Attendance QR{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/qr-attendance.css') }}">{% endblock %}
+
+{% block content %}
+<div class="cems-page-header">
+  <div>
+    <h1 class="cems-page-title">Generate Attendance QR</h1>
+    <p class="cems-page-description">Start a timed session for one of your events. Students scan a single QR code, sign in and are marked present automatically.</p>
+  </div>
+</div>
+
+<div class="cems-card qa-section">
+  <div class="cems-card-header"><div class="cems-card-title">New attendance session</div></div>
+  <div class="cems-card-body">
+    {% if events %}
+    <form method="post" action="{{ url_for('qrattend.start') }}" class="qa-start-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="cems-form-group qa-grow">
+        <label for="qa-event">Event / class</label>
+        <select id="qa-event" name="event_id" class="cems-form-select" required>
+          {% for e in events %}
+          <option value="{{ e.id }}" {{ 'selected' if selected == e.id }}>{{ e.title }} — {{ e.date.strftime('%d %b %Y') if e.date else '' }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="cems-form-group">
+        <label for="qa-minutes">Valid for (minutes, max {{ max_minutes }})</label>
+        <input id="qa-minutes" name="minutes" type="number" min="1" max="{{ max_minutes }}" value="{{ default_minutes }}" class="cems-form-input" required>
+      </div>
+      <button type="submit" class="cems-btn cems-btn-primary">{{ icon('scan', 18) }} Generate QR</button>
+    </form>
+    <p class="xm-muted xm-small">Starting a new session for an event closes any session still open for it.</p>
+    {% else %}
+    <p class="xm-muted">You have no assigned events to take attendance for. Join an upcoming event from your <a href="{{ url_for('faculty_dashboard') }}">dashboard</a> first.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="cems-card qa-section">
+  <div class="cems-card-header">
+    <div class="cems-card-title">Recent sessions</div>
+    <a class="cems-btn cems-btn-outline cems-btn-sm" href="{{ url_for('teacher_attendance') }}">Full attendance report</a>
+  </div>
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>Event</th><th>Started</th><th>Expires</th><th>Present</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for s in sessions %}
+      <tr>
+        <td><strong>{{ s.event.title }}</strong></td>
+        <td>{{ s.created_at.strftime('%d %b, %I:%M %p') }}</td>
+        <td>{{ s.expires_at.strftime('%I:%M %p') }}</td>
+        <td>{{ s.marks|length }}</td>
+        <td><span class="qa-status {{ s.status }}">{{ s.status|title }}</span></td>
+        <td><a class="cems-btn cems-btn-secondary cems-btn-sm" href="{{ url_for('qrattend.view', ref=s.ref) }}">Open</a></td>
+      </tr>
+    {% else %}<tr><td colspan="6" class="xm-muted" style="text-align:center;padding:24px">No sessions yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+{% endblock %}

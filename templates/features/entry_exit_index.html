@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Entry / Exit — CEMS{% endblock %}
+{% block breadcrumb %}Entry / Exit{% endblock %}
+
+{% block content %}
+<div class="cems-page-header"><div><h1 class="cems-page-title">Entry / Exit Tracking</h1><p class="cems-page-description">Record when participants enter and leave an event, and see how long each stayed.</p></div></div>
+<div class="cems-card"><div class="cems-overflow-x-auto"><table class="cems-table">
+  <thead><tr><th>Event</th><th>Date</th><th>Registered</th><th>Entered so far</th><th>Inside now</th><th></th></tr></thead><tbody>
+  {% for row in rows %}
+    <tr><td><strong>{{ row.event.title }}</strong><div class="xm-small xm-muted">{{ row.event.venue }}</div></td><td>{{ row.event.date.strftime('%d %b %Y') }}</td>
+      <td>{{ row.registered }}</td><td>{{ row.visited }}</td><td><strong>{{ row.inside }}</strong></td>
+      <td><a class="cems-btn cems-btn-sm cems-btn-primary" href="{{ url_for('features.entry_exit', event_id=row.event.id) }}">Open desk</a></td></tr>
+  {% else %}<tr><td colspan="6" class="xm-muted" style="text-align:center;padding:28px">No approved events available.</td></tr>{% endfor %}
+  </tbody></table></div></div>
+{% endblock %}

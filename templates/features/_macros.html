@@ -1,0 +1,30 @@
+{# Shared pieces for the extended CEMS modules. #}
+{% macro rate_bar(rate) -%}
+<div class="xm-rate"><div class="xm-bar {{ 'ok' if rate >= 75 else ('warn' if rate >= 40 else 'bad') }}" style="width:90px"><span style="width:{{ [rate, 100]|min }}%"></span></div><strong>{{ rate }}%</strong></div>
+{%- endmacro %}
+
+{% macro stat(label, value, tone='primary', hint='') -%}
+<div class="cems-stat-card"><div class="cems-stat-content"><div class="cems-stat-value">{{ value }}</div><div class="cems-stat-label">{{ label }}</div>{% if hint %}<div class="xm-small xm-muted">{{ hint }}</div>{% endif %}</div></div>
+{%- endmacro %}
+
+{# Department / batch / semester / odd-even filters. `flt` is a ParticipantFilter, `options` the dropdown values. #}
+{% macro participant_filters(flt, options) -%}
+<div class="cems-form-group"><label for="f-dept">Department</label>
+  <select id="f-dept" name="dept" class="cems-form-select"><option value="">All departments</option>
+  {% for d in options.depts %}<option value="{{ d }}" {% if flt.dept == d %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></div>
+<div class="cems-form-group"><label for="f-batch">Batch</label>
+  <select id="f-batch" name="batch" class="cems-form-select"><option value="">All batches</option>
+  {% for b in options.batches %}<option value="{{ b }}" {% if flt.batch == b %}selected{% endif %}>{{ b }}</option>{% endfor %}</select></div>
+<div class="cems-form-group"><label for="f-sem">Semester</label>
+  <select id="f-sem" name="semester" class="cems-form-select"><option value="">Any semester</option>
+  {% for n in options.semesters %}<option value="{{ n }}" {% if flt.semester == n|string %}selected{% endif %}>Semester {{ n }}</option>{% endfor %}</select></div>
+<div class="cems-form-group"><label for="f-parity">Odd / Even</label>
+  <select id="f-parity" name="semester_type" class="cems-form-select">
+    <option value="">Odd &amp; even</option>
+    <option value="odd" {% if flt.semester_type == 'odd' %}selected{% endif %}>Odd semesters (1,3,5,7)</option>
+    <option value="even" {% if flt.semester_type == 'even' %}selected{% endif %}>Even semesters (2,4,6,8)</option></select></div>
+{%- endmacro %}
+
+{% macro status_badge(status) -%}
+<span class="cems-badge {{ {'approved':'cems-badge-success','completed':'cems-badge-info','cancelled':'cems-badge-danger','pending':'cems-badge-warning'}.get(status,'cems-badge-neutral') }}">{{ status|replace('_',' ')|title }}</span>
+{%- endmacro %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from 'features/_macros.html' import stat %}
+{% block title %}My Achievements — CEMS{% endblock %}
+{% block breadcrumb %}My Achievements{% endblock %}
+
+{% block content %}
+<div class="cems-page-header">
+  <div class="cems-page-header-top">
+    <div><h1 class="cems-page-title">My Achievement Points</h1><p class="cems-page-description">Earn +10 for each event you attend and bonus points for winning.</p></div>
+    <div class="cems-page-actions"><a class="cems-btn cems-btn-outline" href="{{ url_for('features.leaderboard') }}">View leaderboard</a></div>
+  </div>
+</div>
+<div class="cems-stats-grid">
+  {{ stat('My points', total) }}
+  {{ stat('Campus rank', ('#' ~ position ~ ' of ' ~ participants) if position else '—') }}
+  {{ stat(dept ~ ' total', dept_total, hint='Department points') }}
+</div>
+<div class="cems-card xm-section">
+  <div class="cems-card-header"><div class="cems-card-title">Points history</div></div>
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>Date</th><th>Event</th><th>Reason</th><th>Points</th></tr></thead><tbody>
+    {% for row in rows %}
+      <tr><td>{{ row.created_at.strftime('%d %b %Y') }}</td><td>{{ row.event.title if row.event else '—' }}</td><td>{{ row.reason }}</td><td><strong>+{{ row.points }}</strong></td></tr>
+    {% else %}<tr><td colspan="4" class="xm-muted" style="text-align:center;padding:28px">No points yet — attend an event to start collecting.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+{% endblock %}

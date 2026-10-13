@@ -134,6 +134,11 @@
             <input type="number" name="capacity" class="cems-form-input" value="{{ event.capacity }}" min="1">
           </div>
         </div>
+        {% set team_enabled = event.is_team_event %}
+        {% set team_min = event.min_team_size or 1 %}
+        {% set team_max = event.max_team_size or 4 %}
+        {% set errors = {} %}
+        {% include 'partials/team_settings.html' %}
       </div>
 
       <!-- Section 3: Target Audience -->
@@ -162,6 +167,8 @@
             <label class="cems-form-label">Target Semester</label>
             <select name="target_semester" class="cems-form-select">
               <option value="">All Semesters</option>
+                <option value="odd" {% if event.target_semester == 'odd' %}selected{% endif %}>Odd semesters (1, 3, 5, 7)</option>
+                <option value="even" {% if event.target_semester == 'even' %}selected{% endif %}>Even semesters (2, 4, 6, 8)</option>
               <option value="1" {% if event.target_semester == '1' %}selected{% endif %}>1st Semester</option>
               <option value="2" {% if event.target_semester == '2' %}selected{% endif %}>2nd Semester</option>
               <option value="3" {% if event.target_semester == '3' %}selected{% endif %}>3rd Semester</option>

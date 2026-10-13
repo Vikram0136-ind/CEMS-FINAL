@@ -299,7 +299,11 @@ function addMessage(text, sender, isError) {
   msg.className = `message ${sender}` + (isError ? " error" : "");
   const now = new Date();
   const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  msg.innerHTML = `${text}<span class="timestamp">${time}</span>`;
+  msg.textContent = text;
+  const stamp = document.createElement("span");
+  stamp.className = "timestamp";
+  stamp.textContent = time;
+  msg.appendChild(stamp);
   messagesEl.appendChild(msg);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }

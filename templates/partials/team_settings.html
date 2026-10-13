@@ -1,0 +1,24 @@
+{# Team-event settings, shared by create_event.html and manage_event.html. Expects `team_src` (event or form values). #}
+<div class="cems-form-group" style="margin-top:12px">
+  <label class="cems-form-label" style="display:flex;gap:10px;align-items:center;cursor:pointer">
+    <input type="checkbox" name="is_team_event" value="1" id="teamEventToggle" {% if team_enabled %}checked{% endif %}>
+    <span>Team event — students register as a team with a team leader</span>
+  </label>
+</div>
+<div class="cems-grid-2" id="teamSizeFields" {% if not team_enabled %}style="display:none"{% endif %}>
+  <div class="cems-form-group">
+    <label class="cems-form-label">Minimum team size</label>
+    <input type="number" name="min_team_size" class="cems-form-input" min="1" max="50" value="{{ team_min }}">
+  </div>
+  <div class="cems-form-group">
+    <label class="cems-form-label">Maximum team size</label>
+    <input type="number" name="max_team_size" class="cems-form-input" min="1" max="50" value="{{ team_max }}">
+    {% if errors and errors.max_team_size %}<span class="cems-form-error">{{ errors.max_team_size }}</span>{% endif %}
+  </div>
+</div>
+<script>
+(function () {
+  var toggle = document.getElementById('teamEventToggle'), box = document.getElementById('teamSizeFields');
+  if (toggle && box) toggle.addEventListener('change', function () { box.style.display = toggle.checked ? '' : 'none'; });
+})();
+</script>

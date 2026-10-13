@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from 'features/_macros.html' import rate_bar, stat %}
+{% block title %}Faculty-wise Reports — CEMS{% endblock %}
+{% block breadcrumb %}Faculty Reports{% endblock %}
+
+{% block content %}
+<div class="cems-page-header">
+  <div class="cems-page-header-top">
+    <div><h1 class="cems-page-title">Faculty-wise Event Reports</h1><p class="cems-page-description">Events coordinated, registrations, attendance ratio and feedback for each faculty member.</p></div>
+    <div class="cems-page-actions"><a class="cems-btn cems-btn-outline" href="{{ url_for('features.faculty_report', **dict(request.args.to_dict(), export='csv')) }}">Export CSV</a></div>
+  </div>
+</div>
+<form method="get" class="cems-card cems-card-body xm-filter-bar" style="padding:16px">
+  <div class="cems-form-group"><label for="f-from">Events from</label><input id="f-from" type="date" name="from" class="cems-form-input" value="{{ request.args.get('from','') }}"></div>
+  <div class="cems-form-group"><label for="f-to">Events to</label><input id="f-to" type="date" name="to" class="cems-form-input" value="{{ request.args.get('to','') }}"></div>
+  <button class="cems-btn cems-btn-primary" type="submit">Apply</button>
+  <a class="cems-btn cems-btn-ghost" href="{{ url_for('features.faculty_report') }}">Reset</a>
+</form>
+
+<div class="cems-card xm-section" style="margin-top:20px">
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>Faculty</th><th>Department</th><th>Events</th><th>Completed</th><th>Upcoming</th><th>Registered</th><th>Attended</th><th>Attendance rate</th><th>Avg rating</th><th>Marks entered</th><th>Winners</th></tr></thead>
+    <tbody>
+    {% for row in report.rows %}
+      <tr>
+        <td><a href="{{ url_for('features.faculty_report', faculty_id=row.faculty.id, **{'from': request.args.get('from',''), 'to': request.args.get('to','')}) }}"><strong>{{ row.faculty.name }}</strong></a></td>
+        <td>{{ row.department }}</td><td>{{ row.events|length }}</td><td>{{ row.completed }}</td><td>{{ row.upcoming }}</td>
+        <td>{{ row.stats.registered }}</td><td>{{ row.stats.attended }}</td><td>{{ rate_bar(row.stats.rate) }}</td>
+        <td>{{ row.avg_rating if row.avg_rating is not none else '—' }}</td><td>{{ row.marks }}</td><td>{{ row.winners }}</td>
+      </tr>
+    {% else %}<tr><td colspan="11" class="xm-muted" style="text-align:center;padding:28px">No faculty events to report.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+
+{% if selected %}
+<div class="cems-card xm-section">
+  <div class="cems-card-header"><div class="cems-card-title">Events coordinated by {{ selected.faculty.name }}</div></div>
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>Event</th><th>Date</th><th>Status</th><th>Registered</th><th>Attended</th><th>Reg : Att</th><th>Rate</th></tr></thead><tbody>
+    {% for e in selected.events|sort(attribute='date', reverse=True) %}
+      {% set regs = e.registrations|selectattr('status','in',['confirmed','approved','pending'])|list %}
+      {% set att = regs|selectattr('attended')|list|length %}
+      <tr><td><a href="{{ url_for('event_details', event_id=e.id) }}">{{ e.title }}</a></td><td>{{ e.date.strftime('%d %b %Y') }}</td><td>{{ e.status|title }}</td>
+        <td>{{ regs|length }}</td><td>{{ att }}</td><td>{{ regs|length }} : {{ att }}</td><td>{{ rate_bar((att * 100 / regs|length)|round(1) if regs else 0) }}</td></tr>
+    {% endfor %}
+    </tbody></table></div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Team — {{ event.title }}{% endblock %}
+{% block breadcrumb %}{{ event.title }} · Team{% endblock %}
+
+{% block content %}
+<div class="cems-page-header"><div>
+  <a class="cems-btn cems-btn-ghost cems-btn-sm" href="{{ url_for('event_details', event_id=event.id) }}">← Back to event</a>
+  <h1 class="cems-page-title">{{ team.name if team else 'Team registration' }}</h1>
+  <p class="cems-page-description">{{ event.title }} · teams of {{ min_size }}–{{ max_size }} members</p></div></div>
+
+{% if team %}
+<div class="cems-grid cems-grid-2">
+  <div class="cems-card"><div class="cems-card-header"><div class="cems-card-title">Members ({{ team.members|length }} / {{ max_size }})</div></div>
+    <div class="cems-card-body">
+      {% if team.members|length < min_size %}<div class="cems-alert cems-alert-warning" style="margin-bottom:12px">Your team needs at least {{ min_size }} members to compete. Share the invite code below.</div>{% endif %}
+      {% for m in team.members %}
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--cems-border-light)">
+        <div><strong>{{ m.user.name }}</strong> {% if m.user_id == team.leader_id %}<span class="cems-badge cems-badge-warning">👑 Team leader</span>{% endif %}
+          <div class="xm-small xm-muted">{{ m.user.roll_no or m.user.email }} · {{ m.registration.status|replace('_',' ')|title }}{% if m.registration.payment_status == 'pending' %} · payment pending{% endif %}</div></div>
+        {% if is_leader and m.user_id != team.leader_id %}
+        <div class="xm-actions">
+          <form method="post" action="{{ url_for('features.team_transfer', team_id=team.id) }}" class="xm-inline" data-confirm="Make {{ m.user.name }} the team leader?"><input type="hidden" name="user_id" value="{{ m.user_id }}"><button class="cems-btn cems-btn-sm cems-btn-outline" type="submit">Make leader</button></form>
+          <form method="post" action="{{ url_for('features.team_remove', team_id=team.id, user_id=m.user_id) }}" class="xm-inline" data-confirm="Remove {{ m.user.name }} from the team? Their registration will be cancelled."><button class="cems-btn cems-btn-sm cems-btn-danger" type="submit">Remove</button></form>
+        </div>{% endif %}
+      </div>
+      {% endfor %}
+    </div></div>
+  <div class="cems-card"><div class="cems-card-header"><div class="cems-card-title">Invite teammates</div></div>
+    <div class="cems-card-body">
+      {% if is_leader %}
+        <p class="xm-muted">Share this code. Teammates enter it on the registration page of this event.</p>
+        <div class="xm-code">{{ team.invite_code }}</div>
+        <div class="xm-actions" style="margin-top:12px">
+          <button type="button" class="cems-btn cems-btn-sm cems-btn-outline" data-copy="{{ team.invite_code }}">Copy code</button>
+          <form method="post" action="{{ url_for('features.team_regenerate_code', team_id=team.id) }}" class="xm-inline"><button class="cems-btn cems-btn-sm cems-btn-ghost" type="submit">New code</button></form>
+        </div>
+        <hr style="margin:20px 0;border:none;border-top:1px solid var(--cems-border-light)">
+        <form method="post" action="{{ url_for('features.team_disband', team_id=team.id) }}" data-confirm="Disband the team? Every member's registration will be cancelled."><button class="cems-btn cems-btn-sm cems-btn-danger" type="submit">Disband team</button></form>
+      {% else %}
+        <p class="xm-muted">Only the team leader can invite or remove members. Your leader is <strong>{{ team.leader.name }}</strong>.</p>
+        <form method="post" action="{{ url_for('features.team_leave', team_id=team.id) }}" data-confirm="Leave this team? Your registration will be cancelled."><button class="cems-btn cems-btn-sm cems-btn-danger" type="submit">Leave team</button></form>
+      {% endif %}
+      <p class="xm-small xm-muted" style="margin-top:16px">Maximum team size: {{ max_size }}.</p>
+    </div></div>
+</div>
+{% else %}
+<div class="cems-card"><div class="cems-card-body">
+  <p>You are not part of a team for this event.</p>
+  {% if can_start %}<a class="cems-btn cems-btn-primary" href="{{ url_for('register_event', event_id=event.id) }}">Create or join a team</a>{% endif %}
+</div></div>
+{% endif %}
+{% endblock %}

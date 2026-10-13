@@ -127,6 +127,10 @@
               <a href="{{ url_for('manage_event', event_id=e.id) }}" class="cems-btn cems-btn-secondary cems-btn-sm">Edit</a>
               {% endif %}
               <a href="{{ url_for('organizer_registrations', event_id=e.id) }}" class="cems-btn cems-btn-secondary cems-btn-sm">Registrations</a>
+              {% if e.status in ('approved', 'completed') %}
+              <a href="{{ url_for('features.competition', event_id=e.id) }}" class="cems-btn cems-btn-outline cems-btn-sm">Rounds &amp; Winners</a>
+              <a href="{{ url_for('features.entry_exit', event_id=e.id) }}" class="cems-btn cems-btn-outline cems-btn-sm">Entry / Exit</a>
+              {% endif %}
             </div>
           </td>
         </tr>

@@ -1,0 +1,32 @@
+{# Published winners of an event (all categories). Expects `event`. #}
+{% set _winners = winners_for(event) %}
+{% set _done = congratulated_ids(event) if current_user.is_authenticated else [] %}
+{% if _winners %}
+<div class="cems-ed-info-card" style="margin-top:20px" id="winners">
+  <h3>🏆 Winners</h3>
+  <table class="cems-table" style="width:100%">
+    <thead><tr><th>Category</th><th>{{ 'Team / Winner' if event.is_team_event else 'Winner' }}</th><th>Department</th><th>Wishes</th></tr></thead>
+    <tbody>
+    {% for w in _winners %}
+      <tr><td><strong>{{ w.category }}</strong></td>
+        <td>{% if w.team %}{{ w.team.name }} <span class="xm-small xm-muted">({{ w.team.members|map(attribute='user')|map(attribute='name')|join(', ') }})</span>{% else %}{{ w.registration.user.name }}{% endif %}</td>
+        <td>{{ user_dept(w.registration.user) }}</td>
+        <td>
+        {% if current_user.is_authenticated %}
+          {% set _members = winner_user_ids(w) %}
+          {% if current_user.id in _members and _members|length == 1 %}<span class="xm-muted xm-small">That's you — congrats! 🎉</span>
+          {% elif _members and _members <= _done %}<span class="xm-chip">Congratulated ✓</span>
+          {% else %}
+          <form method="post" action="{{ url_for('features.congratulate_winner', event_id=event.id, winner_id=w.id) }}" class="xm-actions">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="message" maxlength="200" class="cems-form-input" placeholder="Add a wish (optional)" aria-label="Message" style="min-width:160px">
+            <button type="submit" class="cems-btn cems-btn-primary cems-btn-sm">🎉 Congratulate</button>
+          </form>
+          {% endif %}
+        {% endif %}
+        </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}

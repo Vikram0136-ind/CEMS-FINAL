@@ -123,6 +123,8 @@
 
     {{ timeline.render_event_timeline(event) }}
 
+    {% include 'partials/event_winners.html' %}
+
     <div class="cems-event-detail-grid">
       <section>
         <div class="cems-summary-section">
@@ -180,7 +182,7 @@
             </div>
             <div class="cems-result-stat">
               <div class="cems-result-value">{{ summary.attendance_percentage }}%</div>
-              <div class="cems-result-label">Attendance</div>
+              <div class="cems-result-label">Attendance (registered : attended = {{ summary.total }} : {{ summary.present }})</div>
             </div>
           </div>
           {% else %}

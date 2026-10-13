@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Duplicate ID Detection — CEMS{% endblock %}
+{% block breadcrumb %}Duplicate IDs{% endblock %}
+
+{% block content %}
+<div class="cems-page-header"><div><h1 class="cems-page-title">Duplicate ID Detection</h1>
+  <p class="cems-page-description">Accounts sharing a student ID or roll number, and event registrations where two accounts use the same ID. New sign-ups and registrations with a duplicate ID are blocked automatically.</p></div></div>
+
+{% if admin %}
+<div class="cems-card xm-section"><div class="cems-card-header"><div class="cems-card-title">Accounts sharing an ID ({{ accounts|length }})</div></div>
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>ID type</th><th>Value</th><th>Accounts</th></tr></thead><tbody>
+    {% for g in accounts %}
+      <tr><td>{{ g.kind }}</td><td><code>{{ g.value }}</code></td><td>{% for p in g.profiles %}{{ p.user.name }} <span class="xm-small xm-muted">({{ p.user.email }})</span>{% if not loop.last %}, {% endif %}{% endfor %}</td></tr>
+    {% else %}<tr><td colspan="3" class="xm-muted" style="text-align:center;padding:24px">✓ No duplicate student IDs or roll numbers.</td></tr>{% endfor %}
+    </tbody></table></div></div>
+{% endif %}
+
+<div class="cems-card xm-section"><div class="cems-card-header"><div class="cems-card-title">Event registrations with duplicate IDs ({{ conflicts|length }})</div></div>
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>Event</th><th>Shared ID</th><th>Registrations</th></tr></thead><tbody>
+    {% for c in conflicts %}
+      <tr><td><a href="{{ url_for('event_details', event_id=c.event.id) }}">{{ c.event.title }}</a></td><td><code>{{ c.key }}</code></td>
+        <td>{% for r in c.registrations %}{{ r.user.name }} <span class="xm-small xm-muted">({{ r.ticket_code }}, {{ r.status }})</span>{% if not loop.last %}, {% endif %}{% endfor %}</td></tr>
+    {% else %}<tr><td colspan="3" class="xm-muted" style="text-align:center;padding:24px">✓ No duplicate registrations found.</td></tr>{% endfor %}
+    </tbody></table></div></div>
+{% endblock %}

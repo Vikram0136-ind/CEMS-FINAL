@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% from 'features/_macros.html' import rate_bar %}
+{% block title %}Leaderboard — CEMS{% endblock %}
+{% block breadcrumb %}Leaderboard{% endblock %}
+
+{% block content %}
+<div class="cems-page-header">
+  <div>
+    <h1 class="cems-page-title">Leaderboard</h1>
+    <p class="cems-page-description">Department rankings, the busiest events and the top achievers. Points: +10 for attending, +50 / +35 / +25 for 1st / 2nd / 3rd place, +20 for other winner categories.</p>
+  </div>
+</div>
+
+<div class="cems-card xm-section">
+  <div class="cems-card-header"><div class="cems-card-title">🏆 Department leaderboard</div></div>
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>#</th><th>Department</th><th>Points</th><th>Winners</th><th>Registrations</th><th>Attended</th><th>Attendance rate</th><th>Events joined</th></tr></thead>
+    <tbody>
+    {% for d in board.departments %}
+      <tr><td><span class="xm-medal {{ 'm' ~ loop.index if loop.index <= 3 else '' }}">{{ loop.index }}</span></td>
+        <td><a href="{{ url_for('features.department_detail', dept=d.name) if current_role in ('admin','organizer','faculty') else '#' }}"><strong>{{ d.name }}</strong></a></td>
+        <td><strong>{{ d.points }}</strong></td><td>{{ d.winners }}</td><td>{{ d.registrations }}</td><td>{{ d.attended }}</td><td>{{ rate_bar(d.rate) }}</td><td>{{ d.events_count }}</td></tr>
+    {% else %}<tr><td colspan="8" class="xm-muted" style="text-align:center;padding:24px">No department activity yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+
+<div class="cems-grid cems-grid-2 xm-section">
+  <div class="cems-card">
+    <div class="cems-card-header"><div class="cems-card-title">Most registered events</div></div>
+    <div class="cems-overflow-x-auto"><table class="cems-table">
+      <thead><tr><th>#</th><th>Event</th><th>Registered</th><th>Top department</th></tr></thead><tbody>
+      {% for p in board.most_registered %}
+        <tr><td>{{ loop.index }}</td><td><a href="{{ url_for('event_details', event_id=p.event.id) }}">{{ p.event.title }}</a></td><td><strong>{{ p.stats.registered }}</strong></td><td>{{ p.top_dept }}</td></tr>
+      {% else %}<tr><td colspan="4" class="xm-muted" style="text-align:center">No registrations yet.</td></tr>{% endfor %}
+      </tbody></table></div>
+  </div>
+  <div class="cems-card">
+    <div class="cems-card-header"><div class="cems-card-title">Best attendance (3+ registrations)</div></div>
+    <div class="cems-overflow-x-auto"><table class="cems-table">
+      <thead><tr><th>#</th><th>Event</th><th>Reg : Att</th><th>Rate</th></tr></thead><tbody>
+      {% for p in board.best_attendance %}
+        <tr><td>{{ loop.index }}</td><td><a href="{{ url_for('event_details', event_id=p.event.id) }}">{{ p.event.title }}</a></td><td>{{ p.stats.ratio }}</td><td>{{ rate_bar(p.stats.rate) }}</td></tr>
+      {% else %}<tr><td colspan="4" class="xm-muted" style="text-align:center">Not enough data yet.</td></tr>{% endfor %}
+      </tbody></table></div>
+  </div>
+</div>
+
+<div class="cems-card xm-section">
+  <div class="cems-card-header"><div class="cems-card-title">Which department performed in which event</div></div>
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>Event</th><th>Date</th><th>Participation by department</th><th>Top department</th><th>Winner departments</th></tr></thead><tbody>
+    {% for p in board.performance %}
+      <tr><td><a href="{{ url_for('event_details', event_id=p.event.id) }}">{{ p.event.title }}</a></td><td>{{ p.event.date.strftime('%d %b %Y') }}</td>
+        <td><div class="xm-chips">{% for name, count in p.dept_counts %}<span class="xm-chip">{{ name }} · {{ count }}</span>{% endfor %}</div></td>
+        <td>{{ p.top_dept }}</td>
+        <td>{% if p.winner_depts %}{{ p.winner_depts|join(', ') }}{% else %}<span class="xm-muted">—</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="5" class="xm-muted" style="text-align:center;padding:24px">No events with registrations yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+
+<div class="cems-card xm-section">
+  <div class="cems-card-header"><div class="cems-card-title">⭐ Top students by achievement points</div></div>
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>#</th><th>Student</th><th>Department</th><th>Points</th></tr></thead><tbody>
+    {% for row in board.top_students %}
+      <tr><td><span class="xm-medal {{ 'm' ~ loop.index if loop.index <= 3 else '' }}">{{ loop.index }}</span></td><td>{{ row.user.name }}{% if row.user.id == current_user.id %} <span class="cems-badge cems-badge-primary">You</span>{% endif %}</td><td>{{ row.dept }}</td><td><strong>{{ row.points }}</strong></td></tr>
+    {% else %}<tr><td colspan="4" class="xm-muted" style="text-align:center;padding:24px">No points awarded yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+{% endblock %}

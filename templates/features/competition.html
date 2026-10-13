@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% from 'features/_macros.html' import stat %}
+{% block title %}Competition — {{ event.title }}{% endblock %}
+{% block breadcrumb %}Competition · {{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="cems-page-header">
+  <div class="cems-page-header-top">
+    <div><a class="cems-btn cems-btn-ghost cems-btn-sm" href="{{ url_for('event_details', event_id=event.id) }}">← Event</a>
+      <h1 class="cems-page-title">{{ event.title }} — Rounds, Judges &amp; Winners</h1>
+      <p class="cems-page-description">{{ event.date.strftime('%d %b %Y') }} · {{ event.venue }}{% if event.is_team_event %} · team event ({{ min_size }}–{{ max_size }} per team){% endif %}{% if not can_manage %} · read-only{% endif %}</p></div>
+  </div>
+</div>
+
+<div class="cems-stats-grid">
+  {{ stat('Entries', snap.entries|length, hint='teams' if event.is_team_event else 'participants') }}
+  {{ stat('Rounds', snap.rounds|length) }}
+  {{ stat('Judges', snap.judges|length) }}
+  {{ stat('Winners', winners|length, hint='Published' if published else 'Not published') }}
+</div>
+
+{# ---------------- Rounds ---------------- #}
+<div class="cems-card xm-section" id="rounds">
+  <div class="cems-card-header"><div class="cems-card-title">Event rounds</div></div>
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>#</th><th>Round</th><th>Max score</th><th>Advance top</th><th>Entries</th><th>Status</th>{% if can_manage %}<th>Manage</th>{% endif %}</tr></thead><tbody>
+    {% for rnd in snap.rounds %}
+      <tr>
+        <td>{{ rnd.number }}</td>
+        <td><strong>{{ rnd.name }}</strong>{% if rnd.description %}<div class="xm-small xm-muted">{{ rnd.description }}</div>{% endif %}</td>
+        <td>{{ '%g'|format(rnd.max_score) }}</td><td>{{ rnd.advance_count or 'All' }}</td>
+        <td>{% if snap.locked[rnd.id] %}<span class="xm-muted xm-small">Waiting for round {{ rnd.number - 1 }} to finish</span>{% else %}{{ snap.participants[rnd.id]|length }}{% endif %}</td>
+        <td><span class="cems-badge {{ 'cems-badge-success' if rnd.status == 'completed' else 'cems-badge-info' }}">{{ rnd.status|title }}</span></td>
+        {% if can_manage %}<td>
+          <form method="post" action="{{ url_for('features.competition_rounds', event_id=event.id) }}" class="xm-actions">
+            <input type="hidden" name="round_id" value="{{ rnd.id }}">
+            <input class="cems-form-input" style="width:140px" name="name" value="{{ rnd.name }}" maxlength="100" aria-label="Round name">
+            <input class="cems-form-input" style="width:80px" type="number" step="any" min="1" max="1000" name="max_score" value="{{ '%g'|format(rnd.max_score) }}" aria-label="Max score">
+            <input class="cems-form-input" style="width:80px" type="number" min="1" name="advance_count" value="{{ rnd.advance_count or '' }}" placeholder="Top N" aria-label="Advance count">
+            <button class="cems-btn cems-btn-sm cems-btn-outline" name="action" value="update">Save</button>
+            {% if rnd.status == 'open' %}<button class="cems-btn cems-btn-sm cems-btn-success" name="action" value="complete">Complete round</button>
+            {% else %}<button class="cems-btn cems-btn-sm cems-btn-ghost" name="action" value="reopen">Reopen</button>{% endif %}
+            <button class="cems-btn cems-btn-sm cems-btn-danger" name="action" value="delete" onclick="return confirm('Delete this round and all its scores?')">Delete</button>
+          </form></td>{% endif %}
+      </tr>
+    {% else %}<tr><td colspan="7" class="xm-muted" style="text-align:center;padding:24px">No rounds yet — add Round 1 below. An event with a single round is fine.</td></tr>{% endfor %}
+    </tbody></table></div>
+  {% if can_manage %}
+  <form method="post" action="{{ url_for('features.competition_rounds', event_id=event.id) }}" class="cems-card-body xm-filter-bar">
+    <input type="hidden" name="action" value="add">
+    <div class="cems-form-group" style="flex:2"><label for="rn">New round name</label><input id="rn" name="name" class="cems-form-input" required maxlength="100" placeholder="e.g. Preliminary, Semi-final, Final"></div>
+    <div class="cems-form-group"><label for="rm">Max score</label><input id="rm" type="number" step="any" min="1" max="1000" name="max_score" class="cems-form-input" value="100"></div>
+    <div class="cems-form-group"><label for="ra">Advance top N</label><input id="ra" type="number" min="1" name="advance_count" class="cems-form-input" placeholder="all"></div>
+    <div class="cems-form-group" style="flex:2"><label for="rd">Description</label><input id="rd" name="description" class="cems-form-input" maxlength="500"></div>
+    <button class="cems-btn cems-btn-primary" type="submit">Add round</button>
+  </form>{% endif %}
+</div>
+
+{# ---------------- Judges ---------------- #}
+<div class="cems-card xm-section" id="judges">
+  <div class="cems-card-header"><div class="cems-card-title">Judge panel</div></div>
+  <div class="cems-card-body">
+    {% for j in snap.judges %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--cems-border-light)">
+        <div><strong>{{ j.user.name }}</strong> <span class="xm-small xm-muted">{{ j.user.email }}</span></div>
+        {% if can_manage %}<form method="post" action="{{ url_for('features.competition_judges', event_id=event.id) }}" class="xm-inline"><input type="hidden" name="action" value="remove"><input type="hidden" name="judge_id" value="{{ j.id }}"><button class="cems-btn cems-btn-sm cems-btn-outline" type="submit">Remove</button></form>{% endif %}
+      </div>
+    {% else %}<p class="xm-muted">No judges assigned. Only faculty accounts can judge.</p>{% endfor %}
+    {% if can_manage %}
+    <form method="post" action="{{ url_for('features.competition_judges', event_id=event.id) }}" class="xm-filter-bar" style="margin-top:14px">
+      <div class="cems-form-group" style="flex:2"><label for="jf">Add a faculty judge</label><select id="jf" name="user_id" class="cems-form-select" required><option value="">Choose faculty…</option>{% for u in candidates %}<option value="{{ u.id }}">{{ u.name }} — {{ u.department or 'Faculty' }}</option>{% endfor %}</select></div>
+      <button class="cems-btn cems-btn-primary" type="submit">Add judge</button>
+    </form>{% endif %}
+  </div>
+</div>
+
+{# ---------------- Scores ---------------- #}
+<div class="cems-card xm-section" id="scores">
+  <div class="cems-card-header"><div class="cems-card-title">Scoreboard (average of judges per round, summed)</div></div>
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>Rank</th><th>{{ 'Team' if event.is_team_event else 'Participant' }}</th><th>Dept</th>{% for rnd in snap.rounds %}<th>R{{ rnd.number }}<div class="xm-small xm-muted">/{{ '%g'|format(rnd.max_score) }}</div></th>{% endfor %}<th>Total</th></tr></thead><tbody>
+    {% for row in snap.rows %}
+      <tr><td>{% if row.rank %}<span class="xm-medal {{ 'm' ~ row.rank if row.rank <= 3 else '' }}">{{ row.rank }}</span>{% else %}—{% endif %}</td>
+        <td><strong>{{ row.entry.label }}</strong>{% if row.entry.team %}<div class="xm-small xm-muted">{{ row.entry.members|map(attribute='name')|join(', ') }}</div>{% endif %}</td>
+        <td class="xm-small">{{ row.entry.dept }}</td>
+        {% for rnd in snap.rounds %}<td>{% set v = row.per_round[rnd.id] %}{{ '%g'|format(v) if v is not none else ('·' if row.entry.id in snap.participants[rnd.id] else '✕') }}</td>{% endfor %}
+        <td><strong>{{ '%g'|format(row.total) }}</strong></td></tr>
+    {% else %}<tr><td colspan="{{ 4 + snap.rounds|length }}" class="xm-muted" style="text-align:center;padding:24px">No confirmed participants yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+  <p class="xm-small xm-muted" style="padding:0 16px 12px">· = awaiting scores &nbsp; ✕ = did not advance to this round.</p>
+</div>
+
+{# ---------------- Winners ---------------- #}
+<div class="cems-card xm-section" id="winners">
+  <div class="cems-card-header"><div class="cems-card-title">Winners {% if published %}<span class="cems-badge cems-badge-success">Published</span>{% elif winners %}<span class="cems-badge cems-badge-warning">Draft</span>{% endif %}</div></div>
+  <div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>Category</th><th>{{ 'Team' if event.is_team_event else 'Winner' }}</th><th>Score</th><th>How</th>{% if can_manage %}<th></th>{% endif %}</tr></thead><tbody>
+    {% for w in winners %}
+      <tr><td><strong>{{ w.category }}</strong></td><td>{{ w.team.name if w.team else w.registration.user.name }}</td><td>{{ '%g'|format(w.score) if w.score is not none else '—' }}</td><td>{{ 'Auto (judge scores)' if w.auto else 'Manual' }}</td>
+        {% if can_manage %}<td><form method="post" action="{{ url_for('features.competition_winner_delete', event_id=event.id, winner_id=w.id) }}" class="xm-inline" data-confirm="Remove this winner?"><button class="cems-btn cems-btn-sm cems-btn-outline" type="submit">Remove</button></form></td>{% endif %}</tr>
+    {% else %}<tr><td colspan="5" class="xm-muted" style="text-align:center;padding:24px">No winners declared yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+  {% if can_manage %}
+  <div class="cems-card-body">
+    <div class="xm-actions">
+      <form method="post" action="{{ url_for('features.competition_calculate', event_id=event.id) }}" data-confirm="Recalculate 1st–3rd place from the judge scores? Earlier automatic results will be replaced."><button class="cems-btn cems-btn-primary" type="submit">⚙ Calculate winners automatically</button></form>
+      {% if published %}
+      <form method="post" action="{{ url_for('features.competition_publish', event_id=event.id) }}"><input type="hidden" name="mode" value="unpublish"><button class="cems-btn cems-btn-outline" type="submit">Unpublish results</button></form>
+      {% elif winners %}
+      <form method="post" action="{{ url_for('features.competition_publish', event_id=event.id) }}" data-confirm="Publish the results? Winners are notified and winner certificates become available."><input type="hidden" name="mode" value="publish"><button class="cems-btn cems-btn-success" type="submit">📢 Publish results</button></form>
+      {% endif %}
+    </div>
+    <form method="post" action="{{ url_for('features.competition_winner_add', event_id=event.id) }}" class="xm-filter-bar" style="margin-top:16px">
+      <div class="cems-form-group" style="flex:2"><label for="we">Add another winner category</label><select id="we" name="entry_id" class="cems-form-select" required><option value="">Choose {{ 'team' if event.is_team_event else 'participant' }}…</option>{% for e in snap.entries %}<option value="{{ e.id }}">{{ e.label }}</option>{% endfor %}</select></div>
+      <div class="cems-form-group"><label for="wc">Category</label><select id="wc" name="category" class="cems-form-select">{% for c in categories %}<option>{{ c }}</option>{% endfor %}</select></div>
+      <div class="cems-form-group"><label for="wcu">…or custom</label><input id="wcu" name="custom_category" class="cems-form-input" maxlength="60" placeholder="e.g. Best Poster"></div>
+      <button class="cems-btn cems-btn-outline" type="submit">Add winner</button>
+    </form>
+  </div>{% endif %}
+</div>
+{% endblock %}

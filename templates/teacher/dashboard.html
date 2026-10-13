@@ -11,7 +11,8 @@
       <p class="cems-page-description">Coordinate your events, mark attendance and keep track of student participation.</p>
     </div>
     <div class="cems-page-actions">
-      <a href="{{ url_for('faculty_assigned_events') }}" class="cems-btn cems-btn-primary">{{ icon('clipboard', 18) }} Assigned Events</a>
+      <a href="{{ url_for('qrattend.generate') }}" class="cems-btn cems-btn-primary">{{ icon('scan', 18) }} Generate Attendance QR</a>
+      <a href="{{ url_for('faculty_assigned_events') }}" class="cems-btn cems-btn-outline">{{ icon('clipboard', 18) }} Assigned Events</a>
     </div>
   </div>
 </div>
@@ -44,6 +45,7 @@
             <div class="cems-table-actions">
               <a class="cems-btn cems-btn-secondary cems-btn-sm" href="{{ url_for('teacher_event_details', event_id=event.id) }}">Details</a>
               <a class="cems-btn cems-btn-primary cems-btn-sm" href="{{ url_for('teacher_attendance', event_id=event.id) }}">Attendance</a>
+              <a class="cems-btn cems-btn-outline cems-btn-sm" href="{{ url_for('qrattend.generate', event_id=event.id) }}">QR</a>
             </div>
           </td>
         </tr>

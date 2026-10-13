@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from 'features/_macros.html' import rate_bar, stat, participant_filters %}
+{% block title %}Department Dashboard — CEMS{% endblock %}
+{% block breadcrumb %}Department Dashboard{% endblock %}
+
+{% block content %}
+<div class="cems-page-header">
+  <div class="cems-page-header-top">
+    <div>
+      <h1 class="cems-page-title">Department-wise Dashboard</h1>
+      <p class="cems-page-description">Participation, attendance ratio, winners and achievement points for every department.</p>
+    </div>
+  </div>
+</div>
+
+<form method="get" class="cems-card cems-card-body xm-filter-bar" style="padding:16px">
+  <div class="cems-form-group"><label for="f-from">Events from</label><input id="f-from" type="date" name="from" class="cems-form-input" value="{{ request.args.get('from','') }}"></div>
+  <div class="cems-form-group"><label for="f-to">Events to</label><input id="f-to" type="date" name="to" class="cems-form-input" value="{{ request.args.get('to','') }}"></div>
+  {{ participant_filters(board.flt, board.options) }}
+  <button class="cems-btn cems-btn-primary" type="submit">Apply</button>
+  <a class="cems-btn cems-btn-ghost" href="{{ url_for('features.department_dashboard') }}">Reset</a>
+</form>
+
+<div class="cems-stats-grid" style="margin-top:20px">
+  {{ stat('Departments', board.rows|length) }}
+  {{ stat('Students', totals.students) }}
+  {{ stat('Registrations', totals.registrations) }}
+  {{ stat('Attendance rate', totals.rate ~ '%', hint='Registered : Attended = ' ~ totals.registrations ~ ' : ' ~ totals.attended) }}
+  {{ stat('Winners', totals.winners) }}
+</div>
+
+<div class="cems-card xm-section">
+  <div class="cems-card-header"><div class="cems-card-title">Departments</div></div>
+  <div class="cems-overflow-x-auto">
+    <table class="cems-table">
+      <thead><tr><th>Department</th><th>Students</th><th>Registrations</th><th>Attended</th><th>Reg : Att</th><th>Attendance rate</th><th>Events joined</th><th>Winners</th><th>Points</th><th>Top event</th></tr></thead>
+      <tbody>
+      {% for d in board.rows %}
+        <tr {% if own_dept and d.name == own_dept %}style="background:rgba(236,72,153,.06)"{% endif %}>
+          <td><a href="{{ url_for('features.department_detail', dept=d.name) }}"><strong>{{ d.name }}</strong></a>{% if own_dept and d.name == own_dept %} <span class="cems-badge cems-badge-primary">Yours</span>{% endif %}</td>
+          <td>{{ d.students }}</td>
+          <td><div class="xm-rate"><div class="xm-bar" style="width:90px"><span style="width:{{ (d.registrations * 100 / max_regs)|round }}%"></span></div>{{ d.registrations }}</div></td>
+          <td>{{ d.attended }}</td>
+          <td>{{ d.registrations }} : {{ d.attended }}</td>
+          <td>{{ rate_bar(d.rate) }}</td>
+          <td>{{ d.events_count }}</td>
+          <td>{{ d.winners }}</td>
+          <td><strong>{{ d.points }}</strong></td>
+          <td class="xm-small">{{ d.top_event }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="10" style="text-align:center;padding:32px" class="xm-muted">No department data yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

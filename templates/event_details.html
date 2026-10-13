@@ -542,10 +542,22 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
         Share
       </button>
-      {% if registered %}
+      {% if current_user.is_authenticated and event.status in ('approved', 'completed') %}
+      <form method="post" action="{{ url_for('features.toggle_wishlist', event_id=event.id) }}" class="xm-inline">
+        <input type="hidden" name="next" value="{{ url_for('event_details', event_id=event.id) }}">
+        {% set saved = is_wishlisted(event.id) %}
+        <button type="submit" class="cems-btn cems-btn-outline xm-heart {{ 'on' if saved }}" aria-pressed="{{ 'true' if saved else 'false' }}">{{ '♥ Saved' if saved else '♡ Save event' }}</button>
+      </form>
+      {% endif %}
+      {% if waitlisted %}
+      <a href="{{ url_for('features.waitlist_status', event_id=event.id) }}" class="cems-btn cems-btn-warning">On waitlist · #{{ waitlist_position(my_registration) or '—' }}</a>
+      {% elif registered %}
       <a href="{{ url_for('my_registrations') }}" class="cems-btn cems-btn-success">You're Registered</a>
+      {% if my_team %}<a href="{{ url_for('features.team_page', event_id=event.id) }}" class="cems-btn cems-btn-outline">My team</a>{% endif %}
       {% elif reg_ctx.can_register %}
-      <a href="{{ url_for('register_event', event_id=event.id) }}" class="cems-btn cems-btn-primary">Register Now</a>
+      <a href="{{ url_for('register_event', event_id=event.id) }}" class="cems-btn cems-btn-primary">{{ 'Register a Team' if event.is_team_event else 'Register Now' }}</a>
+      {% elif can_join_waitlist %}
+      <a href="{{ url_for('register_event', event_id=event.id) }}" class="cems-btn cems-btn-warning">Join Waitlist{% if waitlist_count %} ({{ waitlist_count }} waiting){% endif %}</a>
       {% elif not current_user.is_authenticated %}
       <a href="{{ url_for('login', next=url_for('event_details', event_id=event.id)) }}" class="cems-btn cems-btn-primary">Login to Register</a>
       {% else %}
@@ -553,6 +565,16 @@
       {% endif %}
     </div>
   </div>
+
+  {% if event.registration_deadline and event.status == 'approved' and event.date >= now().date() %}
+  <div style="margin:12px 0"><span class="xm-countdown" data-deadline="{{ deadline_iso(event) }}">{{ deadline_label(event) }}</span>
+    {% if event.is_team_event %}<span class="cems-badge cems-badge-info" style="margin-left:8px">Team event · {{ team_limits(event)[0] }}–{{ team_limits(event)[1] }} members</span>{% endif %}</div>
+  {% elif event.is_team_event %}
+  <div style="margin:12px 0"><span class="cems-badge cems-badge-info">Team event · {{ team_limits(event)[0] }}–{{ team_limits(event)[1] }} members</span></div>
+  {% endif %}
+  {% if event.status == 'cancelled' %}
+  <div class="cems-alert cems-alert-danger" style="margin:12px 0"><div><strong>This event has been cancelled.</strong>{% if event.cancellation_reason %} Reason: {{ event.cancellation_reason }}{% endif %}</div></div>
+  {% endif %}
 
   {# ===== MAIN LAYOUT ===== #}
   <div class="cems-ed-layout">
@@ -665,6 +687,13 @@
           <span class="cems-ed-info-value">{{ event.category }} · {{ event.event_type|title }}</span>
         </div>
 
+        {% if event.target_department or event.target_semester %}
+        <div class="cems-ed-info-row">
+          <span class="cems-ed-info-label">Open To</span>
+          <span class="cems-ed-info-value">{{ event.target_department or 'All departments' }} · {% if event.target_semester in ('odd', 'even') %}{{ event.target_semester|title }} semesters{% elif event.target_semester %}Semester {{ event.target_semester }}{% else %}All semesters{% endif %}</span>
+        </div>
+        {% endif %}
+
         <div class="cems-ed-info-row">
           <span class="cems-ed-info-label">Organized By</span>
           <span class="cems-ed-info-value">{{ event.organizer.name if event.organizer else '—' }}</span>
@@ -675,6 +704,14 @@
           <span class="cems-ed-info-value">{{ event.registrations|rejectattr('status', 'in', ['cancelled', 'rejected'])|list|length }}</span>
         </div>
       </div>
+
+      {% include 'partials/event_winners.html' %}
+      {% if current_user.is_authenticated and current_role in ('admin', 'organizer', 'faculty') and event.status in ('approved', 'completed') %}
+      <div class="xm-actions" style="margin:12px 0">
+        <a class="cems-btn cems-btn-outline cems-btn-sm" href="{{ url_for('features.competition', event_id=event.id) }}">Rounds, judges &amp; winners</a>
+        <a class="cems-btn cems-btn-outline cems-btn-sm" href="{{ url_for('features.entry_exit', event_id=event.id) }}">Entry / exit</a>
+      </div>
+      {% endif %}
 
       {# Organizer Card #}
       {% if event.organizer %}

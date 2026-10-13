@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Score entry — {{ event.title }}{% endblock %}
+{% block breadcrumb %}Judge Panel · {{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="cems-page-header"><div>
+  <a class="cems-btn cems-btn-ghost cems-btn-sm" href="{{ url_for('features.judge_index') }}">← Judge panel</a>
+  <h1 class="cems-page-title">{{ event.title }}</h1>
+  <p class="cems-page-description">Enter your score for each {{ 'team' if event.is_team_event else 'participant' }}. Leave blank to skip. You can edit scores while the round is open.</p></div></div>
+
+{% if snap.rounds %}
+<div class="xm-tabs">{% for r in snap.rounds %}<a class="xm-tab {{ 'active' if rnd and r.id == rnd.id }}" href="{{ url_for('features.judge_scoring', event_id=event.id, round=r.id) }}">{{ r.name }} <small>/{{ '%g'|format(r.max_score) }}</small></a>{% endfor %}</div>
+{% if snap.locked[rnd.id] %}
+  <div class="cems-alert cems-alert-info">This round opens once the previous round is marked complete.</div>
+{% else %}
+<form method="post" action="{{ url_for('features.judge_save_scores', event_id=event.id) }}">
+  <input type="hidden" name="round_id" value="{{ rnd.id }}">
+  <div class="cems-card"><div class="cems-overflow-x-auto"><table class="cems-table">
+    <thead><tr><th>{{ 'Team' if event.is_team_event else 'Participant' }}</th><th>Department</th><th>Your score (0–{{ '%g'|format(rnd.max_score) }})</th><th>Remarks</th></tr></thead><tbody>
+    {% for row in rows %}
+      <tr><td><strong>{{ row.entry.label }}</strong>{% if row.entry.team %}<div class="xm-small xm-muted">{{ row.entry.members|map(attribute='name')|join(', ') }}</div>{% endif %}</td>
+        <td>{{ row.entry.dept }}</td>
+        <td><input class="cems-form-input xm-score-input" type="number" step="0.01" min="0" max="{{ '%g'|format(rnd.max_score) }}" name="score_{{ row.entry.id }}" value="{{ '%g'|format(row.score.score) if row.score else '' }}" {% if rnd.status != 'open' %}disabled{% endif %} aria-label="Score for {{ row.entry.label }}"></td>
+        <td><input class="cems-form-input" maxlength="300" name="remarks_{{ row.entry.id }}" value="{{ row.score.remarks if row.score and row.score.remarks else '' }}" {% if rnd.status != 'open' %}disabled{% endif %}></td></tr>
+    {% else %}<tr><td colspan="4" class="xm-muted" style="text-align:center;padding:24px">No entries to score in this round.</td></tr>{% endfor %}
+    </tbody></table></div></div>
+  {% if rows and rnd.status == 'open' %}<div style="margin-top:16px"><button class="cems-btn cems-btn-primary" type="submit">Save scores</button></div>
+  {% elif rnd.status != 'open' %}<div class="cems-alert cems-alert-warning" style="margin-top:12px">This round is closed for scoring.</div>{% endif %}
+</form>
+{% endif %}
+{% else %}
+<div class="cems-empty"><div class="cems-empty-icon">📋</div><div class="cems-empty-title">No rounds yet</div><div class="cems-empty-description">The organizer has not created any rounds for this event.</div></div>
+{% endif %}
+{% endblock %}

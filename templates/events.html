@@ -12,7 +12,14 @@
     </div>
   </div>
   
+  <div class="xm-tabs" role="tablist" aria-label="Event timeline">
+    {% for key, label in (('', 'Upcoming'), ('all', 'All events'), ('past', 'Past'), ('present', 'Happening today'), ('future', 'Future')) %}
+    <a class="xm-tab {{ 'active' if when == key }}" role="tab" href="{{ url_for('events', when=key or None, q=q or None, category=category or None) }}">{{ label }}{% if key and when_counts %}<small>{{ when_counts.get(key, 0) }}</small>{% endif %}</a>
+    {% endfor %}
+  </div>
+
   <form class="cems-filter-bar" method="get">
+    {% if when %}<input type="hidden" name="when" value="{{ when }}">{% endif %}
     <div class="cems-form-group">
       <input type="text" name="q" class="cems-form-input" placeholder="Search events..." value="{{ q }}">
     </div>
@@ -53,11 +60,11 @@
 {% if pagination and pagination.pages > 1 %}
 <div class="cems-pagination">
   {% if pagination.has_prev %}
-  <a href="{{ url_for('events', page=pagination.prev_num, q=q, category=category, status=status) }}" class="cems-pagination-btn">← Previous</a>
+  <a href="{{ url_for('events', page=pagination.prev_num, q=q, category=category, status=status, when=when or None) }}" class="cems-pagination-btn">← Previous</a>
   {% endif %}
   <span class="cems-pagination-info">Page {{ pagination.page }} of {{ pagination.pages }}</span>
   {% if pagination.has_next %}
-  <a href="{{ url_for('events', page=pagination.next_num, q=q, category=category, status=status) }}" class="cems-pagination-btn">Next →</a>
+  <a href="{{ url_for('events', page=pagination.next_num, q=q, category=category, status=status, when=when or None) }}" class="cems-pagination-btn">Next →</a>
   {% endif %}
 </div>
 {% endif %}
